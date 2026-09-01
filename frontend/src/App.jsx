@@ -5,10 +5,9 @@ import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
 import { posts as INITIAL_POSTS } from './data/photos';
 import './App.css';
 
-/**
- * Backend API base URL.
- */
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.DEV
+  ? 'http://localhost:8000'
+  : '/api';
 
 /**
  * Root Application component.
@@ -84,25 +83,25 @@ export function App() {
 
   const filteredPosts = cleanQuery
     ? posts.filter((post) => {
-        const caption = (post.caption || '').toLowerCase();
-        const category = (post.category || '').toLowerCase();
-        const username = (post.username || '').toLowerCase();
-        const captionWords = caption.split(/\s+/);
+      const caption = (post.caption || '').toLowerCase();
+      const category = (post.category || '').toLowerCase();
+      const username = (post.username || '').toLowerCase();
+      const captionWords = caption.split(/\s+/);
 
-        // 1. Tag matches in caption (e.g. "#art")
-        const hasTag = captionWords.includes(searchTag) || caption.includes(searchTag);
+      // 1. Tag matches in caption (e.g. "#art")
+      const hasTag = captionWords.includes(searchTag) || caption.includes(searchTag);
 
-        // 2. Category or username matches (e.g. "art" or "atelier_canvas")
-        const hasCategory = category === searchWord || category.includes(searchWord);
-        const hasUsername = username.includes(searchWord);
+      // 2. Category or username matches (e.g. "art" or "atelier_canvas")
+      const hasCategory = category === searchWord || category.includes(searchWord);
+      const hasUsername = username.includes(searchWord);
 
-        // 3. Exact word in caption matches
-        const hasWord = captionWords.some(
-          (w) => w.replace(/[.,!?:;\"'()#]/g, '') === searchWord
-        );
+      // 3. Exact word in caption matches
+      const hasWord = captionWords.some(
+        (w) => w.replace(/[.,!?:;\"'()#]/g, '') === searchWord
+      );
 
-        return hasTag || hasCategory || hasWord || hasUsername;
-      })
+      return hasTag || hasCategory || hasWord || hasUsername;
+    })
     : posts;
 
   return (
