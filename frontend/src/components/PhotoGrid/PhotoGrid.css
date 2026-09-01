@@ -1,0 +1,112 @@
+/* ==========================================================================
+   PhotoGrid Component - Instagram Responsive Uniform Grid Layout
+   ========================================================================== */
+
+.explore-main {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-sm);
+  box-sizing: border-box;
+}
+
+/* Mobile Default: 1 Column */
+.photo-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+/* Tablet Breakpoint (600px - 1023px): Exactly 2 Columns */
+@media (min-width: 600px) {
+  .explore-main {
+    padding: var(--space-md);
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+  }
+}
+
+/* Desktop Breakpoint (1024px+): Exactly 3 Columns */
+@media (min-width: 1024px) {
+  .explore-main {
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+  }
+}
+
+/* ==========================================================================
+   Infinite Scroll — Sentinel, Loading Spinner, End-of-Feed
+   ========================================================================== */
+
+/* Invisible sentinel element observed by IntersectionObserver */
+.photo-grid__sentinel {
+  height: 1px;
+  width: 100%;
+}
+
+/* Loading Spinner Container */
+.photo-grid__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) 0;
+}
+
+/* Instagram-style gradient spinner ring */
+.photo-grid__spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: 3px solid transparent;
+  border-top-color: var(--color-accent);
+  border-right-color: var(--color-accent-hover);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.photo-grid__loading-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* End-of-Feed Message */
+.photo-grid__end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) 0 var(--space-lg);
+  text-align: center;
+}
+
+.photo-grid__end-icon {
+  font-size: 2rem;
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
+}
+
+.photo-grid__end-text {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}

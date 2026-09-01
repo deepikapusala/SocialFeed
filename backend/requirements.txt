@@ -1,0 +1,10 @@
+# These are the only two packages needed for Point 14.
+#
+# fastapi  — the web framework that lets us define API endpoints.
+# uvicorn  — the ASGI server that runs our FastAPI app.
+# httpx    — an HTTP client used by FastAPI's TestClient for testing.
+fastapi
+uvicorn
+httpx
+# uvicorn main:app --reload     "cd backend"
+# npm run dev                   "cd frontend"

@@ -1,0 +1,104 @@
+/* ==========================================================================
+   App Component Styles
+   ========================================================================== */
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding-bottom: var(--space-xl);
+}
+
+/* ==========================================================================
+   Empty Search Results State
+   ========================================================================== */
+.app__empty-search {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  margin: var(--space-lg) auto;
+  max-width: 480px;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px var(--color-shadow);
+}
+
+.app__empty-icon {
+  font-size: 2.2rem;
+}
+
+.app__empty-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.app__empty-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.app__clear-search-btn {
+  margin-top: var(--space-xs);
+  padding: 8px 18px;
+  background-color: var(--color-accent);
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.app__clear-search-btn:hover {
+  background-color: var(--color-accent-hover);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Error State
+   ========================================================================== */
+.app__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  margin: var(--space-md) auto;
+  max-width: 420px;
+  background-color: var(--color-bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.app__error-detail {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
+.app__retry-btn {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--color-accent);
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.app__retry-btn:hover {
+  background-color: var(--color-accent-hover);
+}
