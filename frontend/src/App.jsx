@@ -7,7 +7,7 @@ import './App.css';
 
 const API_BASE = import.meta.env.DEV
   ? 'http://localhost:8000'
-  : '/api';
+  : 'https://instagram-photo-grid-api.vercel.app';
 
 /**
  * Root Application component.
