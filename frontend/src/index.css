@@ -1,26 +1,31 @@
-/* ==========================================================================
-   Base Design Tokens & Themes
-   - Dark Mode: Absolute Pure Black (no blue tones)
-   - Light Mode: Baby Pink theme (soft pink background with rose accents)
-   - Simple, readable CSS variables and media query support for easy learning
-   ========================================================================== */
-
 :root {
   /* ==========================================
      Dark Mode Palette (Default: Absolute Black)
      ========================================== */
-  --color-bg-primary: #000000;         /* Deep absolute black */
-  --color-bg-surface: #121212;         /* Neutral dark surface */
-  --color-bg-elevated: #1e1e1e;        /* Elevated dark neutral element */
-  --color-text-primary: #ffffff;       /* Pure white text */
-  --color-text-secondary: #a3a3a3;     /* Soft neutral gray */
-  --color-text-muted: #737373;         /* Muted neutral gray */
-  --color-accent: #ff4081;             /* Pink accent */
-  --color-accent-hover: #f50057;       /* Darker pink hover */
-  --color-border: #262626;             /* Neutral dark border (no blue) */
-  --color-input-bg: #141414;           /* Neutral dark input background */
-  --color-overlay: rgba(0, 0, 0, 0.92);/* Pure black backdrop overlay */
-  --color-shadow: rgba(0, 0, 0, 0.6);  /* Dark shadow */
+  --color-bg-primary: #000000;
+  /* Deep absolute black */
+  --color-bg-surface: #121212;
+  /* Neutral dark surface */
+  --color-bg-elevated: #1e1e1e;
+  /* Elevated dark neutral element */
+  --color-text-primary: #ffffff;
+  /* Pure white text */
+  --color-text-secondary: #a3a3a3;
+  /* Soft neutral gray */
+  --color-text-muted: #737373;
+  /* Muted neutral gray */
+  --color-accent: #ff4081;
+  /* Pink accent */
+  --color-accent-hover: #f50057;
+  /* Darker pink hover */
+  --color-border: #262626;
+  /* Neutral dark border (no blue) */
+  --color-input-bg: #141414;
+  /* Neutral dark input background */
+  --color-overlay: rgba(0, 0, 0, 0.92);
+  /* Pure black backdrop overlay */
+  --color-shadow: rgba(0, 0, 0, 0.6);
+  /* Dark shadow */
 
   /* Spacing Tokens */
   --space-xs: 4px;
@@ -53,18 +58,30 @@
    Triggered via data-theme="light" attribute on <html>
    ========================================================================== */
 [data-theme="light"] {
-  --color-bg-primary: #fff0f5;         /* Soft baby pink / Lavender blush */
-  --color-bg-surface: #ffffff;         /* Clean crisp white surface card */
-  --color-bg-elevated: #ffe4ec;        /* Pastel baby pink elevated surface */
-  --color-text-primary: #1f1f1f;       /* Crisp dark text */
-  --color-text-secondary: #5c5c5c;     /* Soft dark gray text */
-  --color-text-muted: #8e8e8e;         /* Muted gray text */
-  --color-accent: #e91e63;             /* Vibrant rose pink accent */
-  --color-accent-hover: #c2185b;       /* Deep rose pink */
-  --color-border: #ffd1dc;             /* Baby pink border */
-  --color-input-bg: #ffffff;           /* Clean white search input */
-  --color-overlay: rgba(20, 5, 10, 0.7);/* Darkened overlay for modal */
-  --color-shadow: rgba(233, 30, 99, 0.12); /* Subtle pinkish shadow */
+  --color-bg-primary: #fff0f5;
+  /* Soft baby pink / Lavender blush */
+  --color-bg-surface: #ffffff;
+  /* Clean crisp white surface card */
+  --color-bg-elevated: #ffe4ec;
+  /* Pastel baby pink elevated surface */
+  --color-text-primary: #1f1f1f;
+  /* Crisp dark text */
+  --color-text-secondary: #5c5c5c;
+  /* Soft dark gray text */
+  --color-text-muted: #8e8e8e;
+  /* Muted gray text */
+  --color-accent: #e91e63;
+  /* Vibrant rose pink accent */
+  --color-accent-hover: #c2185b;
+  /* Deep rose pink */
+  --color-border: #ffd1dc;
+  /* Baby pink border */
+  --color-input-bg: #ffffff;
+  /* Clean white search input */
+  --color-overlay: rgba(20, 5, 10, 0.7);
+  /* Darkened overlay for modal */
+  --color-shadow: rgba(233, 30, 99, 0.12);
+  /* Subtle pinkish shadow */
 }
 
 /* ==========================================================================

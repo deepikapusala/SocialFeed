@@ -5,7 +5,7 @@
 
 posts = [
     {
-        "id": 1,
+        "id": 1, 
         "username": "yosemite_wanderer",
         "userAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
         "category": "Nature",
