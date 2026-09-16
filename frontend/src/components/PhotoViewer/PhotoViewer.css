@@ -45,6 +45,16 @@
   user-select: text;
 }
 
+.post-modal__card--no-media .post-modal__body {
+  padding-top: 16px;
+}
+
+.post-modal__card--no-media .post-modal__caption-text {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
 /* Post Header */
 .post-modal__header {
   display: flex;

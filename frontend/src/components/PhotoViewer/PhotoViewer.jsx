@@ -3,16 +3,20 @@ import { getResponsiveSrcSet } from '../../data/photos';
 import './PhotoViewer.css';
 
 /**
- * PhotoViewer modal renders an authentic Instagram post with an in-post multi-image carousel.
+ * PhotoViewer modal renders an authentic Instagram post modal with an in-post multi-image carousel.
  * Allows swiping, clicking arrows, or using keyboard arrows to navigate through the images
- * belonging to the selected post.
+ * belonging to the selected post. If the post has no media, renders the post cleanly without
+ * an image stage.
  */
 export function PhotoViewer({ post, onClose }) {
-  const images = post.images && post.images.length > 0 ? post.images : [post.imageUrl];
+  const images = Array.isArray(post.images)
+    ? post.images
+    : (post.imageUrl ? [post.imageUrl] : []);
   const totalImages = images.length;
+  const hasMedia = totalImages > 0;
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(Boolean(post.likedByViewer));
   const [isSaved, setIsSaved] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentInput, setCommentInput] = useState('');
@@ -21,14 +25,14 @@ export function PhotoViewer({ post, onClose }) {
   const touchStartXRef = useRef(null);
   const touchStartYRef = useRef(null);
 
-  // Reset image index when a different post opens
+  // Reset state whenever a different post opens
   useEffect(() => {
     setCurrentImageIndex(0);
-    setIsLiked(false);
+    setIsLiked(Boolean(post.likedByViewer));
     setIsSaved(false);
     setComments([]);
     setCommentInput('');
-  }, [post.id]);
+  }, [post.id, post.likedByViewer]);
 
   // Carousel navigation handlers
   const handlePrevImage = () => {
@@ -52,9 +56,9 @@ export function PhotoViewer({ post, onClose }) {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
-      } else if (e.key === 'ArrowLeft') {
+      } else if (e.key === 'ArrowLeft' && hasMedia) {
         handlePrevImage();
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' && hasMedia) {
         handleNextImage();
       }
     };
@@ -67,7 +71,7 @@ export function PhotoViewer({ post, onClose }) {
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = originalOverflow;
     };
-  }, [currentImageIndex, totalImages, onClose]);
+  }, [currentImageIndex, totalImages, hasMedia, onClose]);
 
   // Touch Swipe Handlers for mobile
   const handleTouchStart = (e) => {
@@ -112,15 +116,17 @@ export function PhotoViewer({ post, onClose }) {
     const newComment = {
       id: Date.now(),
       username: 'you',
-      text: commentInput.trim()
+      text: commentInput.trim(),
     };
     setComments((prev) => [...prev, newComment]);
     setCommentInput('');
   };
 
-  const currentImageUrl = images[currentImageIndex];
-  const srcSet = getResponsiveSrcSet(currentImageUrl);
-  const currentLikes = (post.likes || 120) + (isLiked ? 1 : 0);
+  const currentImageUrl = hasMedia ? images[currentImageIndex] : null;
+  const srcSet = currentImageUrl ? getResponsiveSrcSet(currentImageUrl) : '';
+  const initialLikes = post.likeCount ?? post.likes ?? 0;
+  const wasInitiallyLiked = Boolean(post.likedByViewer);
+  const currentLikes = initialLikes + (isLiked ? (wasInitiallyLiked ? 0 : 1) : (wasInitiallyLiked ? -1 : 0));
 
   return (
     <div
@@ -137,7 +143,7 @@ export function PhotoViewer({ post, onClose }) {
       />
 
       {/* Centered Post Card Modal */}
-      <article className="post-modal__card">
+      <article className={`post-modal__card ${!hasMedia ? 'post-modal__card--no-media' : ''}`}>
         {/* Post Header */}
         <header className="post-modal__header">
           <div className="post-modal__user-info">
@@ -163,53 +169,58 @@ export function PhotoViewer({ post, onClose }) {
           </button>
         </header>
 
-        {/* Media Carousel Stage with Swipe Support */}
-        <div
-          className="post-modal__media"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* Carousel Image Counter Pill (e.g. 1/4) */}
-          {totalImages > 1 && (
-            <span className="post-modal__image-counter" aria-label={`Image ${currentImageIndex + 1} of ${totalImages}`}>
-              {currentImageIndex + 1}/{totalImages}
-            </span>
-          )}
+        {/* Media Carousel Stage with Swipe Support (Rendered only when post has media) */}
+        {hasMedia && (
+          <div
+            className="post-modal__media"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Carousel Image Counter Pill (e.g. 1 / 3) */}
+            {totalImages > 1 && (
+              <span
+                className="post-modal__image-counter"
+                aria-label={`Image ${currentImageIndex + 1} of ${totalImages}`}
+              >
+                {currentImageIndex + 1} / {totalImages}
+              </span>
+            )}
 
-          {/* Left / Previous Arrow inside carousel */}
-          {currentImageIndex > 0 && (
-            <button
-              type="button"
-              className="post-modal__carousel-arrow post-modal__carousel-arrow--prev"
-              onClick={handlePrevImage}
-              aria-label="Previous image"
-            >
-              &#8249;
-            </button>
-          )}
+            {/* Left / Previous Arrow inside carousel */}
+            {totalImages > 1 && currentImageIndex > 0 && (
+              <button
+                type="button"
+                className="post-modal__carousel-arrow post-modal__carousel-arrow--prev"
+                onClick={handlePrevImage}
+                aria-label="Previous image"
+              >
+                &#8249;
+              </button>
+            )}
 
-          {/* Right / Next Arrow inside carousel */}
-          {currentImageIndex < totalImages - 1 && (
-            <button
-              type="button"
-              className="post-modal__carousel-arrow post-modal__carousel-arrow--next"
-              onClick={handleNextImage}
-              aria-label="Next image"
-            >
-              &#8250;
-            </button>
-          )}
+            {/* Right / Next Arrow inside carousel */}
+            {totalImages > 1 && currentImageIndex < totalImages - 1 && (
+              <button
+                type="button"
+                className="post-modal__carousel-arrow post-modal__carousel-arrow--next"
+                onClick={handleNextImage}
+                aria-label="Next image"
+              >
+                &#8250;
+              </button>
+            )}
 
-          {/* Current Carousel Image */}
-          <img
-            key={`${post.id}-${currentImageIndex}`}
-            className="post-modal__image"
-            src={currentImageUrl}
-            srcSet={srcSet}
-            sizes="(max-width: 600px) 100vw, (max-width: 1024px) 600px, 700px"
-            alt={`${post.caption || 'Instagram photo'} (image ${currentImageIndex + 1} of ${totalImages})`}
-          />
-        </div>
+            {/* Current Carousel Image */}
+            <img
+              key={`${post.id}-${currentImageIndex}`}
+              className="post-modal__image"
+              src={currentImageUrl}
+              srcSet={srcSet}
+              sizes="(max-width: 600px) 100vw, (max-width: 1024px) 600px, 700px"
+              alt={`${post.caption || post.text || 'Instagram photo'} (image ${currentImageIndex + 1} of ${totalImages})`}
+            />
+          </div>
+        )}
 
         {/* Action Buttons & Carousel Dots */}
         <div className="post-modal__actions">
@@ -252,7 +263,7 @@ export function PhotoViewer({ post, onClose }) {
                   type="button"
                   className={`post-modal__dot ${dotIdx === currentImageIndex ? 'post-modal__dot--active' : ''}`}
                   onClick={() => handleDotClick(dotIdx)}
-                  aria-label={`Go to slide ${dotIdx + 1}`}
+                  aria-label={`Go to image ${dotIdx + 1} of ${totalImages}`}
                 />
               ))}
             </div>
@@ -281,12 +292,12 @@ export function PhotoViewer({ post, onClose }) {
         {/* Post Details (Likes, Caption, Comments, Time) */}
         <div className="post-modal__body">
           <p className="post-modal__likes">
-            Liked by <strong>{post.likedBy || 'alex_travels'}</strong> and <strong>{currentLikes.toLocaleString()} others</strong>
+            <strong>{currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}</strong>
           </p>
 
           <p className="post-modal__caption">
             <strong className="post-modal__caption-username">{post.username || 'instagram_user'} </strong>
-            <span className="post-modal__caption-text">{post.caption || 'Beautiful capture.'}</span>
+            <span className="post-modal__caption-text">{post.caption || post.text || ''}</span>
           </p>
 
           {/* User Comments List */}
@@ -301,7 +312,7 @@ export function PhotoViewer({ post, onClose }) {
           )}
 
           <time className="post-modal__timestamp">
-            {post.timeAgo || '2 hours ago'}
+            {post.timeAgo || 'recently'}
           </time>
         </div>
 

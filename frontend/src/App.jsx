@@ -2,23 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TopBar } from './components/TopBar/TopBar';
 import { PhotoGrid } from './components/PhotoGrid/PhotoGrid';
 import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
-import { posts as INITIAL_POSTS } from './data/photos';
+import { fetchFeedFromApi } from './utils/api';
 import './App.css';
-
-const API_BASE = import.meta.env.DEV
-  ? 'http://localhost:8000'
-  : 'https://instagram-photo-grid-api.vercel.app';
 
 /**
  * Root Application component.
- * - Simple & instant tag search (e.g. #art, #nature, #wanderlust).
- * - Simple light/dark mode toggle (Baby Pink 🌸 vs Absolute Pure Black 🌙).
+ * Consumes the Stage A FastAPI /feed endpoint with opaque cursor pagination.
  */
 export function App() {
-  // Start with INITIAL_POSTS so all posts are immediately available for search
-  const [posts, setPosts] = useState(INITIAL_POSTS);
+  const [posts, setPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
-  const [cursor, setCursor] = useState(0);
+  const [cursor, setCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -42,37 +36,49 @@ export function App() {
   };
 
   /**
-   * Fetch a batch of posts from backend API.
+   * Fetch a batch of posts from FastAPI backend API.
    */
-  const fetchPosts = useCallback(async () => {
-    if (loading || !hasMore) return;
+  const loadPosts = useCallback(async (isInitial = false) => {
+    if (loading) return;
+    const currentCursor = isInitial ? null : cursor;
+    if (!isInitial && !hasMore) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/feed?cursor=${cursor}&limit=12`);
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
-
-      const data = await response.json();
-      if (cursor === 0) {
-        setPosts(data.posts);
-      } else {
-        setPosts((prev) => [...prev, ...data.posts]);
-      }
-      setCursor(data.next_cursor);
-      setHasMore(data.has_more);
+      const result = await fetchFeedFromApi(currentCursor, 10);
+      setPosts((prev) => {
+        if (isInitial || currentCursor === null) {
+          return result.items;
+        }
+        // Deduplicate incoming items by id
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newItems = result.items.filter((item) => !existingIds.has(item.id));
+        return [...prev, ...newItems];
+      });
+      setCursor(result.nextCursor);
+      setHasMore(result.hasMore);
     } catch (err) {
-      console.error('Backend connection notice (using local dataset):', err);
+      console.error('FastAPI Backend connection error:', err);
+      setError({
+        code: err.code || 'CONNECTION_ERROR',
+        message: err.message || 'Unable to connect to the backend server.',
+        requestId: err.requestId || null,
+      });
     } finally {
       setLoading(false);
     }
-  }, [cursor, loading, hasMore]);
+  }, [cursor, hasMore, loading]);
 
   // Initial load on page mount
   useEffect(() => {
-    fetchPosts();
+    loadPosts(true);
   }, []);
+
+  const handleRetry = () => {
+    loadPosts(posts.length === 0);
+  };
 
   // -------------------------------------------------------------
   // Clean hashtag & category search filter
@@ -83,25 +89,21 @@ export function App() {
 
   const filteredPosts = cleanQuery
     ? posts.filter((post) => {
-      const caption = (post.caption || '').toLowerCase();
-      const category = (post.category || '').toLowerCase();
-      const username = (post.username || '').toLowerCase();
-      const captionWords = caption.split(/\s+/);
+        const caption = (post.caption || post.text || '').toLowerCase();
+        const category = (post.category || '').toLowerCase();
+        const username = (post.username || post.author?.handle || '').toLowerCase();
+        const displayName = (post.displayName || post.author?.displayName || '').toLowerCase();
+        const captionWords = caption.split(/\s+/);
 
-      // 1. Tag matches in caption (e.g. "#art")
-      const hasTag = captionWords.includes(searchTag) || caption.includes(searchTag);
+        const hasTag = captionWords.includes(searchTag) || caption.includes(searchTag);
+        const hasCategory = category === searchWord || category.includes(searchWord);
+        const hasUsername = username.includes(searchWord) || displayName.includes(searchWord);
+        const hasWord = captionWords.some(
+          (w) => w.replace(/[.,!?:;\"'()#]/g, '') === searchWord
+        );
 
-      // 2. Category or username matches (e.g. "art" or "atelier_canvas")
-      const hasCategory = category === searchWord || category.includes(searchWord);
-      const hasUsername = username.includes(searchWord);
-
-      // 3. Exact word in caption matches
-      const hasWord = captionWords.some(
-        (w) => w.replace(/[.,!?:;\"'()#]/g, '') === searchWord
-      );
-
-      return hasTag || hasCategory || hasWord || hasUsername;
-    })
+        return hasTag || hasCategory || hasWord || hasUsername;
+      })
     : posts;
 
   return (
@@ -115,13 +117,27 @@ export function App() {
         onToggleTheme={handleToggleTheme}
       />
 
+      {/* Primary Error State when no posts could be loaded */}
+      {error && posts.length === 0 && (
+        <div className="app__error" role="alert">
+          <p><strong>Failed to load social feed</strong></p>
+          <p>{error.message}</p>
+          {error.requestId && (
+            <p className="app__error-detail">Request ID: {error.requestId}</p>
+          )}
+          <button type="button" className="app__retry-btn" onClick={handleRetry}>
+            Retry Connection
+          </button>
+        </div>
+      )}
+
       {/* Message when no posts match search */}
       {cleanQuery && filteredPosts.length === 0 && (
         <div className="app__empty-search">
           <span className="app__empty-icon">🔍</span>
           <p className="app__empty-title">No posts found for "{searchQuery}"</p>
           <p className="app__empty-desc">
-            Try searching for <em>#art, #nature, #coffee, #travel, #food, #ocean</em>...
+            Try searching by tag, caption keyword, or handle...
           </p>
           <button
             type="button"
@@ -134,13 +150,28 @@ export function App() {
       )}
 
       {/* Main Post Grid */}
-      <PhotoGrid
-        posts={filteredPosts}
-        onSelectPost={(post) => setSelectedPost(post)}
-        onLoadMore={fetchPosts}
-        hasMore={cleanQuery ? false : hasMore}
-        loading={loading}
-      />
+      {(!error || posts.length > 0) && (
+        <PhotoGrid
+          posts={filteredPosts}
+          onSelectPost={(post) => setSelectedPost(post)}
+          onLoadMore={() => loadPosts(false)}
+          hasMore={cleanQuery ? false : hasMore}
+          loading={loading}
+        />
+      )}
+
+      {/* Secondary Error Banner when subsequent page fails to load */}
+      {error && posts.length > 0 && (
+        <div className="app__error" role="alert">
+          <p>{error.message}</p>
+          {error.requestId && (
+            <p className="app__error-detail">Request ID: {error.requestId}</p>
+          )}
+          <button type="button" className="app__retry-btn" onClick={handleRetry}>
+            Retry Loading Next Page
+          </button>
+        </div>
+      )}
 
       {/* Carousel Modal Viewer */}
       {selectedPost && (

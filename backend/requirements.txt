@@ -1,10 +1,21 @@
-# These are the only two packages needed for Point 14.
+# Stage A: Python Server Setup Dependencies
 #
-# fastapi  — the web framework that lets us define API endpoints.
-# uvicorn  — the ASGI server that runs our FastAPI app.
-# httpx    — an HTTP client used by FastAPI's TestClient for testing.
-fastapi
-uvicorn
-httpx
-# uvicorn main:app --reload     "cd backend"
-# npm run dev                   "cd frontend"
+# Core Framework & ASGI Server
+fastapi>=0.110.0,<1.0.0
+uvicorn[standard]>=0.28.0,<1.0.0
+
+# Data Validation & Typed Settings
+pydantic>=2.6.0,<3.0.0
+pydantic-settings>=2.2.0,<3.0.0
+
+# HTTP Client for TestClient and Async Requests
+httpx>=0.27.0,<1.0.0
+
+# Testing Frameworks
+pytest>=8.0.0,<9.0.0
+pytest-asyncio>=0.23.0,<1.0.0
+
+# Stage C: Database Integration & Migrations
+sqlalchemy>=2.0.0,<3.0.0
+asyncpg>=0.29.0,<1.0.0
+alembic>=1.13.0,<2.0.0
