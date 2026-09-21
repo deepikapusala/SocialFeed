@@ -87,7 +87,7 @@ def create_app() -> FastAPI:
             message=exc.message,
             details=exc.details,
             request_id=req_id,
-        )
+        ) 
         return JSONResponse(
             status_code=exc.status_code,
             content=envelope,
@@ -179,7 +179,7 @@ def create_app() -> FastAPI:
 
     # 3. Register Routers
     app.include_router(health_router)
-    app.include_router(feed_router)
+    app.include_router(feed_router) 
     app.include_router(posts_router)
     app.include_router(users_router)
     app.include_router(search_router)

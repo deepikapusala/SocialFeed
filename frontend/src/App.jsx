@@ -81,11 +81,11 @@ export function App() {
   };
 
   // -------------------------------------------------------------
-  // Clean hashtag & category search filter
+  // Search filter: Supports '#art', 'art', username, & category
   // -------------------------------------------------------------
   const cleanQuery = searchQuery.trim().toLowerCase();
-  const searchWord = cleanQuery.replace('#', '');
-  const searchTag = '#' + searchWord;
+  const rawTerm = cleanQuery.replace(/^#+/, ''); // Strips leading '#' if present
+  const hashtagTerm = '#' + rawTerm;             // Ensures '#art' format for tag matching
 
   const filteredPosts = cleanQuery
     ? posts.filter((post) => {
@@ -93,18 +93,29 @@ export function App() {
         const category = (post.category || '').toLowerCase();
         const username = (post.username || post.author?.handle || '').toLowerCase();
         const displayName = (post.displayName || post.author?.displayName || '').toLowerCase();
-        const captionWords = caption.split(/\s+/);
 
-        const hasTag = captionWords.includes(searchTag) || caption.includes(searchTag);
-        const hasCategory = category === searchWord || category.includes(searchWord);
-        const hasUsername = username.includes(searchWord) || displayName.includes(searchWord);
-        const hasWord = captionWords.some(
-          (w) => w.replace(/[.,!?:;\"'()#]/g, '') === searchWord
-        );
+        // 1. Match hashtag (e.g. searching '#art' or 'art' matches '#art' in caption)
+        const matchesHashtag = caption.includes(hashtagTerm);
 
-        return hasTag || hasCategory || hasWord || hasUsername;
+        // 2. Match category (e.g. 'Art', 'Nature', 'Coffee')
+        const matchesCategory = category.includes(rawTerm);
+
+        // 3. Match username or display name (e.g. 'yosemite_wanderer', 'atelier_canvas')
+        const matchesUser = username.includes(rawTerm) || displayName.includes(rawTerm);
+
+        // 4. Match general caption words
+        const matchesCaption = caption.includes(cleanQuery) || caption.includes(rawTerm);
+
+        return matchesHashtag || matchesCategory || matchesUser || matchesCaption;
       })
     : posts;
+
+  const handleUpdatePost = useCallback((postId, updates) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, ...updates } : p))
+    );
+    setSelectedPost((prev) => (prev && prev.id === postId ? { ...prev, ...updates } : prev));
+  }, []);
 
   return (
     <div className="app">
@@ -117,26 +128,24 @@ export function App() {
         onToggleTheme={handleToggleTheme}
       />
 
-      {/* Primary Error State when no posts could be loaded */}
+      {/* Primary Error Banner when initial feed load fails */}
       {error && posts.length === 0 && (
         <div className="app__error" role="alert">
-          <p><strong>Failed to load social feed</strong></p>
           <p>{error.message}</p>
           {error.requestId && (
             <p className="app__error-detail">Request ID: {error.requestId}</p>
           )}
           <button type="button" className="app__retry-btn" onClick={handleRetry}>
-            Retry Connection
+            Retry
           </button>
         </div>
       )}
 
       {/* Message when no posts match search */}
-      {cleanQuery && filteredPosts.length === 0 && (
+      {cleanQuery && filteredPosts.length === 0 && !loading && (
         <div className="app__empty-search">
-          <span className="app__empty-icon">🔍</span>
           <p className="app__empty-title">No posts found for "{searchQuery}"</p>
-          <p className="app__empty-desc">
+          <p className="app__empty-subtitle">
             Try searching by tag, caption keyword, or handle...
           </p>
           <button
@@ -178,6 +187,7 @@ export function App() {
         <PhotoViewer
           post={selectedPost}
           onClose={() => setSelectedPost(null)}
+          onUpdatePost={handleUpdatePost}
         />
       )}
     </div>

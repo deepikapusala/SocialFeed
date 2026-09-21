@@ -10,7 +10,7 @@ from app.common.cursor import decode_cursor, encode_cursor, InvalidCursorError
 from app.common.errors import ValidationError
 from app.repositories.base import SocialRepositoryProtocol
 from app.schemas.post import PostItem, FeedResponse
-
+ 
 
 class FeedService:
     """

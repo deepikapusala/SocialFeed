@@ -99,7 +99,7 @@ def decode_cursor(cursor_str: str) -> Tuple[datetime, str]:
     else:
         cursor_padded = cursor_clean
 
-    try:
+    try: 
         raw_bytes = base64.urlsafe_b64decode(cursor_padded.encode("ascii"))
         raw_json = raw_bytes.decode("utf-8")
         payload = json.loads(raw_json)

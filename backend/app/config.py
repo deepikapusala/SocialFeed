@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_file_encoding="utf-8",
+        env_file_encoding="utf-8", 
         extra="ignore",
     )
 
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     )
 
     FRONTEND_ORIGIN: str = Field(
-        default="http://localhost:5173",
+        default="http://localhost:3000",
         description="Allowed frontend CORS origin",
     )
 

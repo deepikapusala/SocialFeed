@@ -163,16 +163,16 @@ class PostgresRepository:
         liked_by_viewer_sq = (
             select(
                 exists(
-                    select(1).where(
+                    select(1)
+                    .where(
                         and_(
                             PostLike.post_id == Post.id,
                             PostLike.user_id == viewer_uuid,
                         )
                     )
+                    .correlate(Post)
                 )
-            )
-            .correlate(Post)
-            .scalar_subquery()
+            ).scalar_subquery()
         )
 
         stmt = (
@@ -360,16 +360,16 @@ class PostgresRepository:
         liked_by_viewer_sq = (
             select(
                 exists(
-                    select(1).where(
+                    select(1)
+                    .where(
                         and_(
                             PostLike.post_id == Post.id,
                             PostLike.user_id == viewer_uuid,
                         )
                     )
+                    .correlate(Post)
                 )
-            )
-            .correlate(Post)
-            .scalar_subquery()
+            ).scalar_subquery()
         )
 
         stmt = (
@@ -457,16 +457,16 @@ class PostgresRepository:
         liked_by_viewer_sq = (
             select(
                 exists(
-                    select(1).where(
+                    select(1)
+                    .where(
                         and_(
                             PostLike.post_id == Post.id,
                             PostLike.user_id == viewer_uuid,
                         )
                     )
+                    .correlate(Post)
                 )
-            )
-            .correlate(Post)
-            .scalar_subquery()
+            ).scalar_subquery()
         )
 
         stmt = (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getResponsiveSrcSet } from '../../data/photos';
+import { getResponsiveSrcSet } from '../../utils/images';
+import { toggleLikeApi, fetchRepliesApi, createReplyApi } from '../../utils/api';
 import './PhotoViewer.css';
 
 /**
@@ -8,7 +9,7 @@ import './PhotoViewer.css';
  * belonging to the selected post. If the post has no media, renders the post cleanly without
  * an image stage.
  */
-export function PhotoViewer({ post, onClose }) {
+export function PhotoViewer({ post, onClose, onUpdatePost }) {
   const images = Array.isArray(post.images)
     ? post.images
     : (post.imageUrl ? [post.imageUrl] : []);
@@ -25,13 +26,29 @@ export function PhotoViewer({ post, onClose }) {
   const touchStartXRef = useRef(null);
   const touchStartYRef = useRef(null);
 
-  // Reset state whenever a different post opens
+  // Reset state and fetch direct replies whenever a different post opens
   useEffect(() => {
     setCurrentImageIndex(0);
     setIsLiked(Boolean(post.likedByViewer));
     setIsSaved(false);
     setComments([]);
     setCommentInput('');
+
+    // Fetch seeded replies for this post
+    if (post.id) {
+      fetchRepliesApi(post.id)
+        .then((res) => {
+          if (res?.items?.length > 0) {
+            const replyList = res.items.map((r) => ({
+              id: r.id,
+              username: r.username || 'user',
+              text: r.text || r.caption || '',
+            }));
+            setComments(replyList);
+          }
+        })
+        .catch(() => {});
+    }
   }, [post.id, post.likedByViewer]);
 
   // Carousel navigation handlers
@@ -96,8 +113,22 @@ export function PhotoViewer({ post, onClose }) {
     touchStartYRef.current = null;
   };
 
-  const handleToggleLike = () => {
-    setIsLiked((prev) => !prev);
+  const handleToggleLike = async () => {
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked); // Optimistic UI update
+
+    try {
+      const res = await toggleLikeApi(post.id, nextLiked);
+      if (onUpdatePost) {
+        onUpdatePost(post.id, {
+          likedByViewer: res.likedByViewer,
+          likeCount: res.likeCount,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update like on server:', err);
+      setIsLiked(!nextLiked); // Revert on failure
+    }
   };
 
   const handleToggleSave = () => {
@@ -110,16 +141,41 @@ export function PhotoViewer({ post, onClose }) {
     }
   };
 
-  const handleAddComment = (e) => {
+  const handleAddComment = async (e) => {
     e.preventDefault();
-    if (!commentInput.trim()) return;
-    const newComment = {
-      id: Date.now(),
-      username: 'you',
-      text: commentInput.trim(),
+    const text = commentInput.trim();
+    if (!text) return;
+
+    // Optimistic comment in UI
+    const tempId = `temp-${Date.now()}`;
+    const optimisticComment = {
+      id: tempId,
+      username: 'asha',
+      text: text,
     };
-    setComments((prev) => [...prev, newComment]);
+    setComments((prev) => [...prev, optimisticComment]);
     setCommentInput('');
+
+    try {
+      const savedReply = await createReplyApi(post.id, text);
+      // Replace optimistic comment with authoritative saved row from PostgreSQL
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === tempId
+            ? { id: savedReply.id, username: savedReply.username || 'asha', text: savedReply.text }
+            : c
+        )
+      );
+      if (onUpdatePost) {
+        onUpdatePost(post.id, {
+          replyCount: (post.replyCount || 0) + 1,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save comment to backend:', err);
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      alert(`Could not post comment: ${err.message}`);
+    }
   };
 
   const currentImageUrl = hasMedia ? images[currentImageIndex] : null;

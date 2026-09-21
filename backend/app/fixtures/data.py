@@ -38,7 +38,7 @@ FIXTURE_USERS: List[Dict[str, Any]] = [
             "smallUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&q=80",
             "largeUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80",
         },
-    },
+    }, 
     {
         "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa03",
         "handle": "atelier_canvas",

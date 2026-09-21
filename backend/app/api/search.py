@@ -11,7 +11,7 @@ from app.services.social_service import SocialService
 
 router = APIRouter(tags=["search"])
 
-
+ 
 @router.get("/search/posts", response_model=FeedResponse)
 @router.get("/search", response_model=FeedResponse)
 async def search_posts(

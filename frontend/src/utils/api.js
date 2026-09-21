@@ -4,8 +4,6 @@
  * and deterministic cursor-based pagination.
  */
 
-import { getExtendedDemoFeedPage } from '../data/extendedFeed';
-
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 /**
@@ -41,7 +39,8 @@ export function normalizePostItem(item) {
     alt: mediaList[0]?.altText || item.alt || item.text || 'Instagram post',
     likes: item.likeCount ?? item.likes ?? 0,
     likeCount: item.likeCount ?? item.likes ?? 0,
-    replyCount: item.replyCount ?? 0,
+    comments: item.comments ?? item.replyCount ?? 0,
+    replyCount: item.comments ?? item.replyCount ?? 0,
     likedByViewer: item.likedByViewer ?? false,
     createdAt: item.createdAt,
     timeAgo: item.timeAgo || formatTimestamp(item.createdAt),
@@ -77,23 +76,129 @@ export function formatTimestamp(isoString) {
 }
 
 /**
- * Fetches paginated feed containing 90 original posts, each with 3 media items.
+ * Fetches paginated feed from FastAPI backend /feed endpoint.
  *
  * @param {string|null} cursor - Opaque cursor token from previous page.
  * @param {number} limit - Number of items to fetch (1..50).
  * @returns {Promise<{ items: Array, nextCursor: string|null, hasMore: boolean, requestId: string|null }>}
  */
 export async function fetchFeedFromApi(cursor = null, limit = 10) {
-  // Small simulated latency (50ms) for authentic smooth network pagination feel
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const url = new URL(`${API_BASE_URL}/feed`);
+  url.searchParams.set('limit', String(limit));
+  if (cursor) {
+    url.searchParams.set('cursor', cursor);
+  }
 
-  const page = getExtendedDemoFeedPage(cursor, limit);
-  const normalizedItems = (page.items || []).map(normalizePostItem);
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData?.error?.message || `Failed to fetch feed (${response.status})`;
+    const err = new Error(message);
+    err.requestId = response.headers.get('x-request-id') || errorData?.requestId;
+    throw err;
+  }
+
+  const data = await response.json();
+  const normalizedItems = (data.items || []).map(normalizePostItem);
 
   return {
     items: normalizedItems,
-    nextCursor: page.nextCursor,
-    hasMore: page.hasMore,
-    requestId: `demo-req-${Date.now()}`,
+    nextCursor: data.nextCursor || null,
+    hasMore: Boolean(data.hasMore),
+    requestId: response.headers.get('x-request-id') || null,
   };
+}
+
+/**
+ * Sets or removes a like on a post via desired-state PUT / DELETE on FastAPI backend.
+ *
+ * @param {string} postId - UUID of the post.
+ * @param {boolean} shouldLike - True to like (PUT), false to unlike (DELETE).
+ * @returns {Promise<{ postId: string, likedByViewer: boolean, likeCount: number }>}
+ */
+export async function toggleLikeApi(postId, shouldLike) {
+  const method = shouldLike ? 'PUT' : 'DELETE';
+  const response = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
+    method: method,
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Like action failed (${response.status})`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Fetches paginated direct replies for a given original post.
+ *
+ * @param {string} postId - UUID of the original post.
+ * @param {string|null} cursor - Optional cursor for reply pagination.
+ * @param {number} limit - Number of replies to fetch.
+ * @returns {Promise<{ items: Array, nextCursor: string|null, hasMore: boolean }>}
+ */
+export async function fetchRepliesApi(postId, cursor = null, limit = 20) {
+  const url = new URL(`${API_BASE_URL}/posts/${postId}/replies`);
+  url.searchParams.set('limit', String(limit));
+  if (cursor) {
+    url.searchParams.set('cursor', cursor);
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    return { items: [], nextCursor: null, hasMore: false };
+  }
+
+  const data = await response.json();
+  return {
+    items: (data.items || []).map(normalizePostItem),
+    nextCursor: data.nextCursor || null,
+    hasMore: Boolean(data.hasMore),
+  };
+}
+
+/**
+ * Creates a new reply (comment) attached to an existing post via POST /posts on FastAPI.
+ *
+ * @param {string} postId - UUID of the parent post.
+ * @param {string} text - Comment text (1..280 chars).
+ * @returns {Promise<Object>}
+ */
+export async function createReplyApi(postId, text) {
+  const response = await fetch(`${API_BASE_URL}/posts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      kind: 'reply',
+      text: text,
+      replyToId: postId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Failed to post comment (${response.status})`);
+  }
+
+  const data = await response.json();
+  return normalizePostItem(data.item);
 }

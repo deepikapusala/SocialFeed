@@ -1,5 +1,5 @@
-import React from 'react';
-import { getResponsiveSrcSet } from '../../data/photos';
+import React, { useState, useEffect } from 'react';
+import { getResponsiveSrcSet } from '../../utils/images';
 import './PhotoCard.css';
 
 /**

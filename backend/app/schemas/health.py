@@ -10,3 +10,4 @@ class HealthResponse(CamelModel):
     Response schema for GET /health/live.
     """
     status: str = "ok"
+  
