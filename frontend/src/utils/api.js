@@ -41,10 +41,62 @@ export function normalizePostItem(item) {
     likeCount: item.likeCount ?? item.likes ?? 0,
     comments: item.comments ?? item.replyCount ?? 0,
     replyCount: item.comments ?? item.replyCount ?? 0,
+    repostCount: item.repostCount ?? 0,
+    authorId: item.author?.id || item.authorId || item.userId || null,
+    followedByViewer: Boolean(item.author?.followedByViewer ?? item.followedByViewer ?? false),
     likedByViewer: item.likedByViewer ?? false,
+    repostedByViewer: Boolean(item.repostedByViewer ?? false),
     createdAt: item.createdAt,
     timeAgo: item.timeAgo || formatTimestamp(item.createdAt),
   };
+}
+
+/**
+ * Sets or removes a repost on an original post via POST / DELETE on FastAPI backend.
+ *
+ * @param {string} postId - UUID of the original post.
+ * @param {boolean} shouldRepost - True to repost (POST), false to undo (DELETE).
+ * @returns {Promise<{ postId: string, repostedByViewer: boolean, repostCount: number }>}
+ */
+export async function toggleRepostApi(postId, shouldRepost) {
+  const method = shouldRepost ? 'POST' : 'DELETE';
+  const response = await fetch(`${API_BASE_URL}/posts/${postId}/repost`, {
+    method: method,
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Repost action failed (${response.status})`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Toggles follow state for a target user via PUT /users/{id}/follow or DELETE /users/{id}/follow.
+ *
+ * @param {string} userId - UUID of target user to follow/unfollow.
+ * @param {boolean} shouldFollow - True to follow, false to unfollow.
+ * @returns {Promise<{ userId: string, followedByViewer: boolean, followerCount: number }>}
+ */
+export async function toggleFollowApi(userId, shouldFollow) {
+  const method = shouldFollow ? 'PUT' : 'DELETE';
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/follow`, {
+    method: method,
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Follow action failed (${response.status})`);
+  }
+
+  return await response.json();
 }
 
 /**

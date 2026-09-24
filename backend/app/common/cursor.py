@@ -19,7 +19,7 @@ from typing import Tuple
 MAX_CURSOR_LENGTH = 1024
 SUPPORTED_CURSOR_VERSION = 1
 
-
+  
 class InvalidCursorError(ValueError):
     """Raised when a cursor string cannot be decoded or fails validation."""
     pass

@@ -25,7 +25,9 @@ class PostItem(CamelModel):
     media: List[MediaItem] = []
     like_count: int = 0
     reply_count: int = 0
+    repost_count: int = 0
     liked_by_viewer: bool = False
+    reposted_by_viewer: bool = False
     reply_to_id: Optional[str] = None
     repost_of_id: Optional[str] = None
 
@@ -70,3 +72,13 @@ class LikeResponse(CamelModel):
     post_id: str
     liked_by_viewer: bool
     like_count: int
+
+
+class RepostResponse(CamelModel):
+    """
+    Response body for POST /posts/{id}/repost and DELETE /posts/{id}/repost.
+    """
+    post_id: str
+    reposted_by_viewer: bool
+    repost_count: int
+

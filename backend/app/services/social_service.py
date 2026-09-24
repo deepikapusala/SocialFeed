@@ -12,7 +12,7 @@ from app.common.errors import NotFoundError, ValidationError
 from app.repositories.base import SocialRepositoryProtocol
 from app.schemas.common import PaginatedResponse
 from app.schemas.media import MediaItem
-from app.schemas.post import PostItem, PostDetailResponse, FeedResponse, LikeResponse
+from app.schemas.post import PostItem, PostDetailResponse, FeedResponse, LikeResponse, RepostResponse
 from app.schemas.user import UserProfile, UserProfileResponse
 
 
@@ -57,17 +57,41 @@ class SocialService:
 
         return PostDetailResponse(item=PostItem(**raw_post))
 
-    async def get_user_profile(self, user_id: str) -> UserProfileResponse:
+    async def get_user_profile(self, user_id: str, viewer_id: Optional[str] = None) -> UserProfileResponse:
         """
         Retrieves user profile and statistics by UUID.
         """
         clean_user_id = self._validate_uuid(user_id, "id")
-        raw_user = await self._repository.get_user_profile(clean_user_id)
+        raw_user = await self._repository.get_user_profile(clean_user_id, viewer_id=viewer_id)
 
         if not raw_user:
             raise NotFoundError(f"User with id '{clean_user_id}' not found.")
 
         return UserProfileResponse(item=UserProfile(**raw_user))
+
+    async def follow_user(self, follower_id: str, target_user_id: str) -> Dict[str, Any]:
+        """
+        Follows target user for the current viewer actor.
+        """
+        clean_target_id = self._validate_uuid(target_user_id, "id")
+        is_following, follower_count = await self._repository.follow_user(follower_id, clean_target_id)
+        return {
+            "user_id": clean_target_id,
+            "followed_by_viewer": is_following,
+            "follower_count": follower_count,
+        }
+
+    async def unfollow_user(self, follower_id: str, target_user_id: str) -> Dict[str, Any]:
+        """
+        Unfollows target user for the current viewer actor.
+        """
+        clean_target_id = self._validate_uuid(target_user_id, "id")
+        is_following, follower_count = await self._repository.unfollow_user(follower_id, clean_target_id)
+        return {
+            "user_id": clean_target_id,
+            "followed_by_viewer": is_following,
+            "follower_count": follower_count,
+        }
 
     async def list_direct_replies(
         self,
@@ -260,3 +284,25 @@ class SocialService:
             res = await self._repository.remove_like(user_id=user_id, post_id=clean_post_id)
             return LikeResponse(**res)
         raise ValidationError("Repository does not support like removal", status_code=500)
+
+    async def create_repost(self, user_id: str, post_id: str) -> RepostResponse:
+        """
+        Creates a repost of an original post for viewer.
+        """
+        clean_post_id = self._validate_uuid(post_id, "id")
+        if hasattr(self._repository, "create_repost"):
+            res = await self._repository.create_repost(user_id=user_id, post_id=clean_post_id)
+            return RepostResponse(**res)
+        # Fallback to create_post
+        raw_post = await self.create_post(author_id=user_id, kind="repost", repost_of_id=clean_post_id)
+        return RepostResponse(post_id=clean_post_id, reposted_by_viewer=True, repost_count=1)
+
+    async def remove_repost(self, user_id: str, post_id: str) -> RepostResponse:
+        """
+        Removes a repost of an original post for viewer.
+        """
+        clean_post_id = self._validate_uuid(post_id, "id")
+        if hasattr(self._repository, "remove_repost"):
+            res = await self._repository.remove_repost(user_id=user_id, post_id=clean_post_id)
+            return RepostResponse(**res)
+        raise ValidationError("Repository does not support repost removal", status_code=500)

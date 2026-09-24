@@ -40,3 +40,23 @@ def test_get_user_profile_valid_missing_uuid_returns_404(client: TestClient):
     data = res.json()
     assert data["error"]["code"] == "NOT_FOUND"
     assert "requestId" in data
+
+
+def test_follow_and_unfollow_user_endpoints(client: TestClient):
+    target_user_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02"
+    # PUT /users/{id}/follow
+    res = client.put(f"/users/{target_user_id}/follow")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["userId"] == target_user_id
+    assert data["followedByViewer"] is True
+    assert "followerCount" in data
+
+    # DELETE /users/{id}/follow
+    del_res = client.delete(f"/users/{target_user_id}/follow")
+    assert del_res.status_code == 200
+    del_data = del_res.json()
+    assert del_data["userId"] == target_user_id
+    assert del_data["followedByViewer"] is False
+    assert "followerCount" in del_data
+

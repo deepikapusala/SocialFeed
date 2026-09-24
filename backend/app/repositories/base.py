@@ -40,10 +40,43 @@ class SocialRepositoryProtocol(Protocol):
     async def get_user_profile(
         self,
         user_id: str,
+        viewer_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Fetches user profile by UUID, including author info, bio, avatar, and statistics
-        (postCount, followerCount, followingCount).
+        Fetches user profile by UUID, including author info, bio, avatar, statistics,
+        and followedByViewer state.
+        """
+        ...
+
+    async def follow_user(
+        self,
+        follower_id: str,
+        following_id: str,
+    ) -> Tuple[bool, int]:
+        """
+        Establishes a follow edge between follower_id and following_id.
+        Returns (followedByViewer, updatedFollowerCount).
+        """
+        ...
+
+    async def unfollow_user(
+        self,
+        follower_id: str,
+        following_id: str,
+    ) -> Tuple[bool, int]:
+        """
+        Removes a follow edge between follower_id and following_id.
+        Returns (followedByViewer, updatedFollowerCount).
+        """
+        ...
+
+    async def is_following(
+        self,
+        follower_id: str,
+        following_id: str,
+    ) -> bool:
+        """
+        Checks if follower_id is following following_id.
         """
         ...
 
@@ -91,5 +124,19 @@ class SocialRepositoryProtocol(Protocol):
     async def get_post_kind(self, post_id: str) -> Optional[str]:
         """
         Returns the kind ('original', 'reply', 'repost') of a post if it exists.
+        """
+        ...
+
+    async def create_repost(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        """
+        Creates a repost of an original post for viewer.
+        Returns Dict with postId, repostedByViewer, repostCount.
+        """
+        ...
+
+    async def remove_repost(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        """
+        Removes a repost of an original post for viewer.
+        Returns Dict with postId, repostedByViewer, repostCount.
         """
         ...

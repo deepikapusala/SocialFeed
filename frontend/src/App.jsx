@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TopBar } from './components/TopBar/TopBar';
 import { PhotoGrid } from './components/PhotoGrid/PhotoGrid';
 import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
-import { fetchFeedFromApi } from './utils/api';
+import { fetchFeedFromApi, toggleFollowApi } from './utils/api';
 import './App.css';
 
 /**
@@ -34,6 +34,70 @@ export function App() {
   const handleToggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
+
+  /**
+   * Toggle follow state for an author across all posts synchronously.
+   */
+  const handleToggleFollow = useCallback(async ({ authorId, authorHandle, shouldFollow }) => {
+    // 1. Optimistic UI update across all posts authored by this user
+    setPosts((prev) =>
+      prev.map((p) => {
+        const matchesId = authorId && (p.authorId === authorId || p.author?.id === authorId);
+        const matchesHandle = authorHandle && (
+          p.username?.toLowerCase() === authorHandle.toLowerCase() ||
+          p.author?.handle?.toLowerCase() === authorHandle.toLowerCase()
+        );
+        if (matchesId || matchesHandle) {
+          return {
+            ...p,
+            followedByViewer: shouldFollow,
+            author: p.author ? { ...p.author, followedByViewer: shouldFollow } : p.author,
+          };
+        }
+        return p;
+      })
+    );
+
+    setSelectedPost((prev) => {
+      if (!prev) return null;
+      const matchesId = authorId && (prev.authorId === authorId || prev.author?.id === authorId);
+      const matchesHandle = authorHandle && (
+        prev.username?.toLowerCase() === authorHandle.toLowerCase() ||
+        prev.author?.handle?.toLowerCase() === authorHandle.toLowerCase()
+      );
+      if (matchesId || matchesHandle) {
+        return {
+          ...prev,
+          followedByViewer: shouldFollow,
+          author: prev.author ? { ...prev.author, followedByViewer: shouldFollow } : prev.author,
+        };
+      }
+      return prev;
+    });
+
+    // 2. Call backend API if authorId is available
+    if (authorId) {
+      try {
+        await toggleFollowApi(authorId, shouldFollow);
+      } catch (err) {
+        console.error('Failed to toggle follow on server:', err);
+        // Revert optimistic update on error
+        setPosts((prev) =>
+          prev.map((p) => {
+            const matchesId = p.authorId === authorId || p.author?.id === authorId;
+            if (matchesId) {
+              return {
+                ...p,
+                followedByViewer: !shouldFollow,
+                author: p.author ? { ...p.author, followedByViewer: !shouldFollow } : p.author,
+              };
+            }
+            return p;
+          })
+        );
+      }
+    }
+  }, []);
 
   /**
    * Fetch a batch of posts from FastAPI backend API.
@@ -163,6 +227,7 @@ export function App() {
         <PhotoGrid
           posts={filteredPosts}
           onSelectPost={(post) => setSelectedPost(post)}
+          onToggleFollow={handleToggleFollow}
           onLoadMore={() => loadPosts(false)}
           hasMore={cleanQuery ? false : hasMore}
           loading={loading}
@@ -188,6 +253,7 @@ export function App() {
           post={selectedPost}
           onClose={() => setSelectedPost(null)}
           onUpdatePost={handleUpdatePost}
+          onToggleFollow={handleToggleFollow}
         />
       )}
     </div>

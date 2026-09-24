@@ -39,7 +39,7 @@ class PostgresRepository:
     # Helper Serialization & Mapping
     # -----------------------------------------------------------------------
     @staticmethod
-    def _format_author_dict(user: User) -> Dict[str, Any]:
+    def _format_author_dict(user: User, followed_by_viewer: bool = False) -> Dict[str, Any]:
         avatar = None
         if user.avatar_small_url or user.avatar_large_url:
             avatar = {
@@ -51,6 +51,7 @@ class PostgresRepository:
             "handle": user.handle,
             "displayName": user.display_name,
             "avatar": avatar,
+            "followedByViewer": followed_by_viewer,
         }
 
     @staticmethod
@@ -73,6 +74,9 @@ class PostgresRepository:
         like_count: int,
         reply_count: int,
         liked_by_viewer: bool,
+        followed_by_viewer: bool = False,
+        repost_count: int = 0,
+        reposted_by_viewer: bool = False,
         referenced_author_handle: Optional[str] = None,
         referenced_text: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -97,11 +101,13 @@ class PostgresRepository:
             "kind": post.kind,
             "text": post.text,
             "createdAt": post.created_at.isoformat().replace("+00:00", "Z") if hasattr(post.created_at, "isoformat") else str(post.created_at),
-            "author": self._format_author_dict(post.author),
+            "author": self._format_author_dict(post.author, followed_by_viewer=followed_by_viewer),
             "media": media_list,
             "likeCount": like_count,
             "replyCount": reply_count,
+            "repostCount": repost_count,
             "likedByViewer": liked_by_viewer,
+            "repostedByViewer": reposted_by_viewer,
             "replyToId": str(post.reply_to_id) if post.reply_to_id else None,
             "repostOfId": str(post.repost_of_id) if post.repost_of_id else None,
         }
@@ -174,6 +180,43 @@ class PostgresRepository:
                 )
             ).scalar_subquery()
         )
+        followed_by_viewer_sq = (
+            select(
+                exists(
+                    select(1)
+                    .where(
+                        and_(
+                            Follow.follower_id == viewer_uuid,
+                            Follow.following_id == Post.author_id,
+                        )
+                    )
+                    .correlate(Post)
+                )
+            ).scalar_subquery()
+        )
+
+        repost_post = aliased(Post)
+        repost_count_sq = (
+            select(func.count(repost_post.id))
+            .where(and_(repost_post.kind == "repost", repost_post.repost_of_id == Post.id))
+            .correlate(Post)
+            .scalar_subquery()
+        )
+        reposted_by_viewer_sq = (
+            select(
+                exists(
+                    select(1)
+                    .where(
+                        and_(
+                            repost_post.kind == "repost",
+                            repost_post.author_id == viewer_uuid,
+                            repost_post.repost_of_id == Post.id,
+                        )
+                    )
+                    .correlate(Post)
+                )
+            ).scalar_subquery()
+        )
 
         stmt = (
             select(
@@ -181,6 +224,9 @@ class PostgresRepository:
                 like_count_sq.label("like_count"),
                 reply_count_sq.label("reply_count"),
                 liked_by_viewer_sq.label("liked_by_viewer"),
+                followed_by_viewer_sq.label("followed_by_viewer"),
+                repost_count_sq.label("repost_count"),
+                reposted_by_viewer_sq.label("reposted_by_viewer"),
             )
             .join(Post.author)
             .options(
@@ -202,6 +248,9 @@ class PostgresRepository:
                 like_count=row[1] or 0,
                 reply_count=row[2] or 0,
                 liked_by_viewer=bool(row[3]),
+                followed_by_viewer=bool(row[4]),
+                repost_count=row[5] or 0,
+                reposted_by_viewer=bool(row[6]),
             )
             for row in rows
         ]
@@ -240,6 +289,39 @@ class PostgresRepository:
                 )
             ).scalar_subquery()
         )
+        followed_by_viewer_sq = (
+            select(
+                exists(
+                    select(1)
+                    .where(
+                        and_(
+                            Follow.follower_id == viewer_uuid,
+                            Follow.following_id == Post.author_id,
+                        )
+                    )
+                    .correlate(Post)
+                )
+            ).scalar_subquery()
+        )
+        repost_post = aliased(Post)
+        repost_count_sq = (
+            select(func.count(repost_post.id))
+            .where(and_(repost_post.kind == "repost", repost_post.repost_of_id == post_uuid))
+            .scalar_subquery()
+        )
+        reposted_by_viewer_sq = (
+            select(
+                exists(
+                    select(1).where(
+                        and_(
+                            repost_post.kind == "repost",
+                            repost_post.author_id == viewer_uuid,
+                            repost_post.repost_of_id == post_uuid,
+                        )
+                    )
+                )
+            ).scalar_subquery()
+        )
 
         stmt = (
             select(
@@ -247,6 +329,9 @@ class PostgresRepository:
                 like_count_sq.label("like_count"),
                 reply_count_sq.label("reply_count"),
                 liked_by_viewer_sq.label("liked_by_viewer"),
+                followed_by_viewer_sq.label("followed_by_viewer"),
+                repost_count_sq.label("repost_count"),
+                reposted_by_viewer_sq.label("reposted_by_viewer"),
             )
             .options(
                 selectinload(Post.author),
@@ -260,7 +345,9 @@ class PostgresRepository:
         if not row:
             return None
 
-        post, like_cnt, reply_cnt, liked = row[0], row[1] or 0, row[2] or 0, bool(row[3])
+        post, like_cnt, reply_cnt, liked, followed, repost_cnt, reposted = (
+            row[0], row[1] or 0, row[2] or 0, bool(row[3]), bool(row[4]), row[5] or 0, bool(row[6])
+        )
         ref_handle, ref_text = None, None
 
         if post.kind == "repost" and post.repost_of_id:
@@ -280,6 +367,9 @@ class PostgresRepository:
             like_count=like_cnt,
             reply_count=reply_cnt,
             liked_by_viewer=liked,
+            followed_by_viewer=followed,
+            repost_count=repost_cnt,
+            reposted_by_viewer=reposted,
             referenced_author_handle=ref_handle,
             referenced_text=ref_text,
         )
@@ -287,11 +377,19 @@ class PostgresRepository:
     async def get_user_profile(
         self,
         user_id: str,
+        viewer_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         try:
             user_uuid = uuid.UUID(user_id)
         except ValueError:
             return None
+
+        viewer_uuid = None
+        if viewer_id:
+            try:
+                viewer_uuid = uuid.UUID(viewer_id)
+            except ValueError:
+                pass
 
         # Scalar subqueries for profile counts
         post_count_sq = (
@@ -309,12 +407,25 @@ class PostgresRepository:
             .where(Follow.follower_id == user_uuid)
             .scalar_subquery()
         )
+        followed_by_viewer_sq = (
+            select(
+                exists(
+                    select(1).where(
+                        and_(
+                            Follow.follower_id == viewer_uuid,
+                            Follow.following_id == user_uuid,
+                        )
+                    )
+                )
+            ).scalar_subquery() if viewer_uuid else select(False).scalar_subquery()
+        )
 
         stmt = select(
             User,
             post_count_sq.label("post_count"),
             follower_count_sq.label("follower_count"),
             following_count_sq.label("following_count"),
+            followed_by_viewer_sq.label("followed_by_viewer"),
         ).where(User.id == user_uuid)
 
         result = await self._session.execute(stmt)
@@ -322,7 +433,9 @@ class PostgresRepository:
         if not row:
             return None
 
-        user, post_cnt, follower_cnt, following_cnt = row[0], row[1] or 0, row[2] or 0, row[3] or 0
+        user, post_cnt, follower_cnt, following_cnt, followed_by_viewer = (
+            row[0], row[1] or 0, row[2] or 0, row[3] or 0, bool(row[4])
+        )
         avatar = None
         if user.avatar_small_url or user.avatar_large_url:
             avatar = {
@@ -339,6 +452,7 @@ class PostgresRepository:
             "postCount": post_cnt,
             "followerCount": follower_cnt,
             "followingCount": following_cnt,
+            "followedByViewer": followed_by_viewer,
         }
 
     async def list_direct_replies(
@@ -711,7 +825,7 @@ class PostgresRepository:
     async def get_repost_lookup(self, author_id: str, original_post_id: str) -> Optional[Dict[str, Any]]:
         author_uuid = uuid.UUID(author_id)
         original_uuid = uuid.UUID(original_post_id)
-
+    
         stmt = (
             select(Post)
             .where(
@@ -732,3 +846,142 @@ class PostgresRepository:
             "repostOfId": str(post.repost_of_id),
             "createdAt": post.created_at.isoformat().replace("+00:00", "Z") if hasattr(post.created_at, "isoformat") else str(post.created_at),
         }
+
+    async def is_following(self, follower_id: str, following_id: str) -> bool:
+        try:
+            follower_uuid = uuid.UUID(follower_id)
+            following_uuid = uuid.UUID(following_id)
+        except ValueError:
+            return False
+
+        stmt = select(
+            exists(
+                select(1).where(
+                    and_(
+                        Follow.follower_id == follower_uuid,
+                        Follow.following_id == following_uuid,
+                    )
+                )
+            )
+        )
+        result = await self._session.execute(stmt)
+        return bool(result.scalar())
+
+    async def follow_user(self, follower_id: str, following_id: str) -> Tuple[bool, int]:
+        try:
+            follower_uuid = uuid.UUID(follower_id)
+            following_uuid = uuid.UUID(following_id)
+        except ValueError as e:
+            raise ValidationError("Invalid UUID format.", details=[{"reason": "invalid_uuid"}]) from e
+
+        if follower_uuid == following_uuid:
+            raise ValidationError("Self-follow is prohibited.", details=[{"reason": "self_follow_prohibited"}], status_code=400)
+
+        target_exists = await self.user_exists(following_id)
+        if not target_exists:
+            raise NotFoundError("Target user not found.", details=[{"field": "followingId", "reason": "not_found"}])
+
+        try:
+            stmt = (
+                pg_insert(Follow)
+                .values(
+                    follower_id=follower_uuid,
+                    following_id=following_uuid,
+                )
+                .on_conflict_do_nothing(index_elements=["follower_id", "following_id"])
+            )
+            await self._session.execute(stmt)
+            await self._session.commit()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            raise ConflictError("Follow relation conflict.", details=[{"reason": "duplicate_follow"}]) from exc
+
+        count_stmt = select(func.count(Follow.follower_id)).where(Follow.following_id == following_uuid)
+        res = await self._session.execute(count_stmt)
+        follower_count = res.scalar() or 0
+        return True, follower_count
+
+    async def unfollow_user(self, follower_id: str, following_id: str) -> Tuple[bool, int]:
+        try:
+            follower_uuid = uuid.UUID(follower_id)
+            following_uuid = uuid.UUID(following_id)
+        except ValueError as e:
+            raise ValidationError("Invalid UUID format.", details=[{"reason": "invalid_uuid"}]) from e
+
+        target_exists = await self.user_exists(following_id)
+        if not target_exists:
+            raise NotFoundError("Target user not found.", details=[{"field": "followingId", "reason": "not_found"}])
+
+        stmt = delete(Follow).where(
+            and_(
+                Follow.follower_id == follower_uuid,
+                Follow.following_id == following_uuid,
+            )
+        )
+        await self._session.execute(stmt)
+        await self._session.commit()
+
+        count_stmt = select(func.count(Follow.follower_id)).where(Follow.following_id == following_uuid)
+        res = await self._session.execute(count_stmt)
+        follower_count = res.scalar() or 0
+        return False, follower_count
+
+    async def get_repost_count(self, post_id: str) -> int:
+        post_uuid = uuid.UUID(post_id)
+        stmt = select(func.count(Post.id)).where(
+            and_(Post.kind == "repost", Post.repost_of_id == post_uuid)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar() or 0
+
+    async def create_repost(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        user_uuid = uuid.UUID(user_id)
+        post_uuid = uuid.UUID(post_id)
+
+        post_kind = await self.get_post_kind(post_id)
+        if post_kind is None:
+            raise NotFoundError("Post not found", [{"field": "postId", "reason": "not_found"}])
+        if post_kind == "repost":
+            raise ValidationError("Reposting a repost is rejected", [{"field": "postId", "reason": "invalid_kind"}], status_code=422)
+
+        existing_lookup = await self.get_repost_lookup(user_id, post_id)
+        if not existing_lookup:
+            repost_id = uuid.uuid4()
+            stmt = pg_insert(Post).values(
+                id=repost_id,
+                author_id=user_uuid,
+                kind="repost",
+                repost_of_id=post_uuid,
+                created_at=datetime.now(),
+            )
+            await self._session.execute(stmt)
+            await self._session.commit()
+
+        repost_count = await self.get_repost_count(post_id)
+        return {
+            "postId": post_id,
+            "repostedByViewer": True,
+            "repostCount": repost_count,
+        }
+
+    async def remove_repost(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        user_uuid = uuid.UUID(user_id)
+        post_uuid = uuid.UUID(post_id)
+
+        stmt = delete(Post).where(
+            and_(
+                Post.kind == "repost",
+                Post.author_id == user_uuid,
+                Post.repost_of_id == post_uuid,
+            )
+        )
+        await self._session.execute(stmt)
+        await self._session.commit()
+
+        repost_count = await self.get_repost_count(post_id)
+        return {
+            "postId": post_id,
+            "repostedByViewer": False,
+            "repostCount": repost_count,
+        }
+

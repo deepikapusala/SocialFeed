@@ -8,7 +8,7 @@ import './PhotoCard.css';
  * with a multi-photo carousel badge if applicable, or a clean typography card
  * if the post has no media attachments.
  */
-export function PhotoCard({ post, index, onSelectPost }) {
+export function PhotoCard({ post, index, onSelectPost, onToggleFollow }) {
   const images = Array.isArray(post.images)
     ? post.images
     : (post.imageUrl ? [post.imageUrl] : []);
@@ -17,13 +17,30 @@ export function PhotoCard({ post, index, onSelectPost }) {
   const isCarousel = images.length > 1;
   const srcSet = firstImage ? getResponsiveSrcSet(firstImage) : '';
 
+  const authorId = post.authorId || post.author?.id;
+  const authorHandle = post.username || post.author?.handle || 'user';
+  const isSelf = authorId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' || authorHandle.toLowerCase() === 'asha';
+  const isFollowing = Boolean(post.followedByViewer || post.author?.followedByViewer);
+
+  const handleFollowClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onToggleFollow) {
+      onToggleFollow({
+        authorId,
+        authorHandle,
+        shouldFollow: !isFollowing,
+      });
+    }
+  };
+
   return (
     <article className={`photo-card ${!hasImages ? 'photo-card--text' : ''}`}>
       <button
         type="button"
         className="photo-card__button"
         onClick={() => onSelectPost(post, index)}
-        aria-label={`View post by ${post.username || 'user'}: ${post.caption || post.text || 'Post'}`}
+        aria-label={`View post by ${authorHandle}: ${post.caption || post.text || 'Post'}`}
       >
         {hasImages ? (
           <>
@@ -36,6 +53,28 @@ export function PhotoCard({ post, index, onSelectPost }) {
               loading="lazy"
               decoding="async"
             />
+
+            {/* Top Bar Header Overlay */}
+            <div className="photo-card__top-overlay" onClick={(e) => e.stopPropagation()}>
+              <div className="photo-card__author-info">
+                <img
+                  className="photo-card__author-avatar"
+                  src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}
+                  alt={authorHandle}
+                />
+                <span className="photo-card__author-username">@{authorHandle}</span>
+              </div>
+              {!isSelf && (
+                <button
+                  type="button"
+                  className={`ig-follow-btn ${isFollowing ? 'ig-follow-btn--following' : ''}`}
+                  onClick={handleFollowClick}
+                  aria-label={isFollowing ? `Unfollow ${authorHandle}` : `Follow ${authorHandle}`}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+              )}
+            </div>
 
             {isCarousel && (
               <span
@@ -62,20 +101,41 @@ export function PhotoCard({ post, index, onSelectPost }) {
                 </svg>
                 {post.replyCount ?? 0}
               </span>
+              <span className="photo-card__overlay-stat">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 2l4 4-4 4" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <path d="M7 22l-4-4 4-4" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
+                {post.repostCount ?? 0}
+              </span>
             </span>
           </>
         ) : (
           <div className="photo-card__text-content">
             <div className="photo-card__text-header">
-              <img
-                className="photo-card__text-avatar"
-                src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}
-                alt={post.username || 'user'}
-              />
-              <div className="photo-card__text-user">
-                <span className="photo-card__text-username">@{post.username || 'user'}</span>
-                <span className="photo-card__text-time">{post.timeAgo || 'recently'}</span>
+              <div className="photo-card__text-user-group">
+                <img
+                  className="photo-card__text-avatar"
+                  src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}
+                  alt={authorHandle}
+                />
+                <div className="photo-card__text-user">
+                  <span className="photo-card__text-username">@{authorHandle}</span>
+                  <span className="photo-card__text-time">{post.timeAgo || 'recently'}</span>
+                </div>
               </div>
+              {!isSelf && (
+                <button
+                  type="button"
+                  className={`ig-follow-btn ${isFollowing ? 'ig-follow-btn--following' : ''}`}
+                  onClick={handleFollowClick}
+                  aria-label={isFollowing ? `Unfollow ${authorHandle}` : `Follow ${authorHandle}`}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+              )}
             </div>
             <p className="photo-card__text-body">
               {post.caption || post.text || 'Original post'}
@@ -92,6 +152,15 @@ export function PhotoCard({ post, index, onSelectPost }) {
                   <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
                 </svg>
                 {post.replyCount ?? 0}
+              </span>
+              <span className="photo-card__stat-item">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 2l4 4-4 4" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <path d="M7 22l-4-4 4-4" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
+                {post.repostCount ?? 0}
               </span>
             </div>
             <span className="photo-card__overlay" aria-hidden="true" />

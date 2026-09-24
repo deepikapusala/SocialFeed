@@ -51,20 +51,31 @@ class FixtureRepository:
                 return u
         return None
 
-    def _get_author_dict(self, user_id: str) -> Dict[str, Any]:
+    def _is_following(self, follower_id: Optional[str], following_id: str) -> bool:
+        if not follower_id:
+            return False
+        return any(
+            f["followerId"] == follower_id and f["followingId"] == following_id
+            for f in self._follows
+        )
+
+    def _get_author_dict(self, user_id: str, viewer_id: Optional[str] = None) -> Dict[str, Any]:
         user = self._find_user(user_id)
+        followed_by_viewer = self._is_following(viewer_id, user_id)
         if not user:
             return {
                 "id": user_id,
                 "handle": "unknown_user",
                 "displayName": "Unknown User",
                 "avatar": None,
+                "followedByViewer": followed_by_viewer,
             }
         return {
             "id": user["id"],
             "handle": user["handle"],
             "displayName": user["displayName"],
             "avatar": user.get("avatar"),
+            "followedByViewer": followed_by_viewer,
         }
 
     def _get_media_for_post(self, post_id: str) -> List[Dict[str, Any]]:
@@ -89,8 +100,14 @@ class FixtureRepository:
     def _count_replies(self, post_id: str) -> int:
         return sum(1 for r in self._replies if r["replyToId"] == post_id)
 
+    def _count_reposts(self, post_id: str) -> int:
+        return sum(1 for p in self._reposts if p.get("repostOfId") == post_id)
+
     def _is_liked_by_viewer(self, post_id: str, viewer_id: str) -> bool:
         return any(lk["userId"] == viewer_id and lk["postId"] == post_id for lk in self._likes)
+
+    def _is_reposted_by_viewer(self, post_id: str, viewer_id: str) -> bool:
+        return any(p.get("repostOfId") == post_id and p.get("authorId") == viewer_id for p in self._reposts)
 
     def _assemble_post(self, post_raw: Dict[str, Any], viewer_id: str) -> Dict[str, Any]:
         post_id = post_raw["id"]
@@ -99,11 +116,13 @@ class FixtureRepository:
             "kind": post_raw["kind"],
             "text": post_raw.get("text"),
             "createdAt": post_raw["createdAt"],
-            "author": self._get_author_dict(post_raw["authorId"]),
+            "author": self._get_author_dict(post_raw["authorId"], viewer_id),
             "media": self._get_media_for_post(post_id) if post_raw["kind"] == "original" else [],
             "likeCount": self._count_likes(post_id),
             "replyCount": self._count_replies(post_id),
+            "repostCount": self._count_reposts(post_id),
             "likedByViewer": self._is_liked_by_viewer(post_id, viewer_id),
+            "repostedByViewer": self._is_reposted_by_viewer(post_id, viewer_id),
             "replyToId": post_raw.get("replyToId"),
             "repostOfId": post_raw.get("repostOfId"),
         }
@@ -167,6 +186,7 @@ class FixtureRepository:
     async def get_user_profile(
         self,
         user_id: str,
+        viewer_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         await self._simulate_io()
         user = self._find_user(user_id)
@@ -177,6 +197,7 @@ class FixtureRepository:
         post_count = sum(1 for p in self._originals if p["authorId"] == user_id)
         follower_count = sum(1 for f in self._follows if f["followingId"] == user_id)
         following_count = sum(1 for f in self._follows if f["followerId"] == user_id)
+        followed_by_viewer = self._is_following(viewer_id, user_id) if viewer_id else False
 
         return {
             "id": user["id"],
@@ -187,7 +208,46 @@ class FixtureRepository:
             "postCount": post_count,
             "followerCount": follower_count,
             "followingCount": following_count,
+            "followedByViewer": followed_by_viewer,
         }
+
+    async def follow_user(
+        self,
+        follower_id: str,
+        following_id: str,
+    ) -> Tuple[bool, int]:
+        await self._simulate_io()
+        if follower_id == following_id:
+            raise ValueError("Self-follow is not allowed.")
+        if not any(f["followerId"] == follower_id and f["followingId"] == following_id for f in self._follows):
+            self._follows.append({
+                "followerId": follower_id,
+                "followingId": following_id,
+                "createdAt": datetime.utcnow().isoformat() + "Z"
+            })
+        follower_count = sum(1 for f in self._follows if f["followingId"] == following_id)
+        return True, follower_count
+
+    async def unfollow_user(
+        self,
+        follower_id: str,
+        following_id: str,
+    ) -> Tuple[bool, int]:
+        await self._simulate_io()
+        self._follows = [
+            f for f in self._follows
+            if not (f["followerId"] == follower_id and f["followingId"] == following_id)
+        ]
+        follower_count = sum(1 for f in self._follows if f["followingId"] == following_id)
+        return False, follower_count
+
+    async def is_following(
+        self,
+        follower_id: str,
+        following_id: str,
+    ) -> bool:
+        await self._simulate_io()
+        return self._is_following(follower_id, following_id)
 
     async def list_direct_replies(
         self,
@@ -272,3 +332,34 @@ class FixtureRepository:
             if p["id"] == post_id:
                 return p["kind"]
         return None
+
+    async def create_repost(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        await self._simulate_io()
+        if not any(r.get("repostOfId") == post_id and r.get("authorId") == user_id for r in self._reposts):
+            import uuid
+            self._reposts.append({
+                "id": str(uuid.uuid4()),
+                "authorId": user_id,
+                "kind": "repost",
+                "repostOfId": post_id,
+                "createdAt": datetime.utcnow().isoformat() + "Z",
+            })
+        repost_count = self._count_reposts(post_id)
+        return {
+            "postId": post_id,
+            "repostedByViewer": True,
+            "repostCount": repost_count,
+        }
+
+    async def remove_repost(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        await self._simulate_io()
+        self._reposts = [
+            r for r in self._reposts
+            if not (r.get("repostOfId") == post_id and r.get("authorId") == user_id)
+        ]
+        repost_count = self._count_reposts(post_id)
+        return {
+            "postId": post_id,
+            "repostedByViewer": False,
+            "repostCount": repost_count,
+        }

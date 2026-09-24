@@ -41,82 +41,108 @@
   transition: transform var(--transition-normal);
 }
 
-/* Multi-photo Carousel Badge */
-.photo-card__carousel-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 3;
-  background-color: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  color: #ffffff;
-  padding: 5px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  pointer-events: none;
-}
-
-/* Hover Overlay */
-.photo-card__overlay {
+/* Top Header Overlay on Image Cards */
+.photo-card__top-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-  pointer-events: none;
+  z-index: 5;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.photo-card__author-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.photo-card__author-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid #0095f6;
+  flex-shrink: 0;
+}
+
+.photo-card__author-username {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Premium Instagram Classic Follow / Following Button */
+.ig-follow-btn {
+  background: #0095f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, transform 0.15s ease, border-color 0.2s ease, color 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 149, 246, 0.35);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  z-index: 2;
+  flex-shrink: 0;
 }
 
-.photo-card__overlay-stat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.ig-follow-btn:hover {
+  background: #1877f2;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 149, 246, 0.45);
+}
+
+.ig-follow-btn:active {
+  transform: translateY(0);
+}
+
+/* Following State Button */
+.ig-follow-btn--following {
+  background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  font-weight: 700;
-  font-size: 0.9375rem;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: none;
 }
 
-/* Hover & Focus Interactions */
-.photo-card:hover .photo-card__overlay {
-  opacity: 1;
+.ig-follow-btn--following:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: none;
 }
 
-.photo-card:hover .photo-card__image {
-  transform: scale(1.04);
-}
-
-.photo-card__button:focus-visible {
-  outline: 3px solid var(--color-accent);
-  outline-offset: -3px;
-  z-index: 4;
-}
-
-/* Text Post Layout */
-.photo-card__text-content {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 100%;
-  padding: 16px;
-  box-sizing: border-box;
-}
-
+/* Text Post Header Adjustments */
 .photo-card__text-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  width: 100%;
+}
+
+.photo-card__text-user-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .photo-card__text-avatar {

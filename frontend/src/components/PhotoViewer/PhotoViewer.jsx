@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getResponsiveSrcSet } from '../../utils/images';
-import { toggleLikeApi, fetchRepliesApi, createReplyApi } from '../../utils/api';
+import { toggleLikeApi, toggleRepostApi, fetchRepliesApi, createReplyApi } from '../../utils/api';
 import './PhotoViewer.css';
 
 /**
@@ -9,15 +9,33 @@ import './PhotoViewer.css';
  * belonging to the selected post. If the post has no media, renders the post cleanly without
  * an image stage.
  */
-export function PhotoViewer({ post, onClose, onUpdatePost }) {
+export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
   const images = Array.isArray(post.images)
     ? post.images
     : (post.imageUrl ? [post.imageUrl] : []);
   const totalImages = images.length;
   const hasMedia = totalImages > 0;
 
+  const authorId = post.authorId || post.author?.id;
+  const authorHandle = post.username || post.author?.handle || 'user';
+  const isSelf = authorId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' || authorHandle.toLowerCase() === 'asha';
+  const isFollowing = Boolean(post.followedByViewer || post.author?.followedByViewer);
+
+  const handleFollowClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onToggleFollow) {
+      onToggleFollow({
+        authorId,
+        authorHandle,
+        shouldFollow: !isFollowing,
+      });
+    }
+  };
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(Boolean(post.likedByViewer));
+  const [isReposted, setIsReposted] = useState(Boolean(post.repostedByViewer));
   const [isSaved, setIsSaved] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentInput, setCommentInput] = useState('');
@@ -30,6 +48,7 @@ export function PhotoViewer({ post, onClose, onUpdatePost }) {
   useEffect(() => {
     setCurrentImageIndex(0);
     setIsLiked(Boolean(post.likedByViewer));
+    setIsReposted(Boolean(post.repostedByViewer));
     setIsSaved(false);
     setComments([]);
     setCommentInput('');
@@ -131,6 +150,24 @@ export function PhotoViewer({ post, onClose, onUpdatePost }) {
     }
   };
 
+  const handleToggleRepost = async () => {
+    const nextReposted = !isReposted;
+    setIsReposted(nextReposted); // Optimistic UI update
+
+    try {
+      const res = await toggleRepostApi(post.id, nextReposted);
+      if (onUpdatePost) {
+        onUpdatePost(post.id, {
+          repostedByViewer: res.repostedByViewer,
+          repostCount: res.repostCount,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update repost on server:', err);
+      setIsReposted(!nextReposted); // Revert on failure
+    }
+  };
+
   const handleToggleSave = () => {
     setIsSaved((prev) => !prev);
   };
@@ -184,6 +221,10 @@ export function PhotoViewer({ post, onClose, onUpdatePost }) {
   const wasInitiallyLiked = Boolean(post.likedByViewer);
   const currentLikes = initialLikes + (isLiked ? (wasInitiallyLiked ? 0 : 1) : (wasInitiallyLiked ? -1 : 0));
 
+  const initialReposts = post.repostCount ?? 0;
+  const wasInitiallyReposted = Boolean(post.repostedByViewer);
+  const currentReposts = initialReposts + (isReposted ? (wasInitiallyReposted ? 0 : 1) : (wasInitiallyReposted ? -1 : 0));
+
   return (
     <div
       className="post-modal"
@@ -206,14 +247,25 @@ export function PhotoViewer({ post, onClose, onUpdatePost }) {
             <img
               className="post-modal__avatar"
               src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80'}
-              alt={post.username || 'user avatar'}
+              alt={authorHandle}
             />
             <div className="post-modal__user-meta">
-              <span className="post-modal__username">{post.username || 'instagram_user'}</span>
+              <span className="post-modal__username">@{authorHandle}</span>
               {post.category && (
                 <span className="post-modal__category">• {post.category}</span>
               )}
             </div>
+            {!isSelf && (
+              <button
+                type="button"
+                className={`ig-follow-btn ${isFollowing ? 'ig-follow-btn--following' : ''}`}
+                onClick={handleFollowClick}
+                style={{ marginLeft: '12px' }}
+                aria-label={isFollowing ? `Unfollow ${authorHandle}` : `Follow ${authorHandle}`}
+              >
+                {isFollowing ? 'Following' : 'Follow'}
+              </button>
+            )}
           </div>
           <button
             type="button"
@@ -308,6 +360,22 @@ export function PhotoViewer({ post, onClose, onUpdatePost }) {
                 <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
               </svg>
             </button>
+
+            {/* Repost Action Button (Exact Instagram Curved Loop Icon) */}
+            <button
+              type="button"
+              className={`post-modal__action-btn post-modal__action-btn--repost ${isReposted ? 'is-reposted' : ''}`}
+              onClick={handleToggleRepost}
+              aria-label={isReposted ? 'Undo repost' : 'Repost post'}
+              title={isReposted ? 'Undo Repost' : 'Repost'}
+            >
+              <svg className="icon-repost" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={isReposted ? "#10b981" : "currentColor"} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 2l4 4-4 4" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                <path d="M7 22l-4-4 4-4" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+            </button>
           </div>
 
           {/* Carousel Pagination Dots Indicator (● ○ ○ ○) */}
@@ -345,10 +413,15 @@ export function PhotoViewer({ post, onClose, onUpdatePost }) {
           </div>
         </div>
 
-        {/* Post Details (Likes, Caption, Comments, Time) */}
+        {/* Post Details (Likes, Reposts, Caption, Comments, Time) */}
         <div className="post-modal__body">
           <p className="post-modal__likes">
             <strong>{currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}</strong>
+            {currentReposts > 0 && (
+              <span className="post-modal__reposts-count" style={{ marginLeft: '12px', color: 'var(--color-text-secondary)' }}>
+                • <strong>{currentReposts.toLocaleString()} {currentReposts === 1 ? 'repost' : 'reposts'}</strong>
+              </span>
+            )}
           </p>
 
           <p className="post-modal__caption">

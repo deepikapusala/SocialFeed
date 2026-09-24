@@ -9,7 +9,7 @@ import './PhotoGrid.css';
  * Uses an Intersection Observer on a sentinel element at the bottom of the grid
  * to trigger infinite scroll — loading the next batch from the backend API.
  */
-export function PhotoGrid({ posts, onSelectPost, onLoadMore, hasMore, loading }) {
+export function PhotoGrid({ posts, onSelectPost, onToggleFollow, onLoadMore, hasMore, loading }) {
   const sentinelRef = useRef(null);
 
   // Intersection Observer: when the sentinel div scrolls into view, fetch more posts
@@ -46,6 +46,7 @@ export function PhotoGrid({ posts, onSelectPost, onLoadMore, hasMore, loading })
             post={post}
             index={index}
             onSelectPost={onSelectPost}
+            onToggleFollow={onToggleFollow}
           />
         ))}
       </section>

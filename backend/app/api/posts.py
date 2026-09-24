@@ -12,6 +12,7 @@ from app.schemas.post import (
     LikeResponse,
     PostDetailResponse,
     PostItem,
+    RepostResponse,
 )
 from app.services.social_service import SocialService
 
@@ -96,3 +97,30 @@ async def remove_post_like(
     """
     service = SocialService(repo)
     return await service.remove_like(user_id=actor_id, post_id=id)
+
+
+@router.post("/posts/{id}/repost", response_model=RepostResponse)
+@router.put("/posts/{id}/repost", response_model=RepostResponse)
+async def create_post_repost(
+    id: str,
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+    actor_id: str = Depends(get_current_actor_id),
+) -> RepostResponse:
+    """
+    Creates a repost for the current viewer on target original post.
+    """
+    service = SocialService(repo)
+    return await service.create_repost(user_id=actor_id, post_id=id)
+
+
+@router.delete("/posts/{id}/repost", response_model=RepostResponse)
+async def remove_post_repost(
+    id: str,
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+    actor_id: str = Depends(get_current_actor_id),
+) -> RepostResponse:
+    """
+    Removes repost for the current viewer on target original post.
+    """
+    service = SocialService(repo)
+    return await service.remove_repost(user_id=actor_id, post_id=id)

@@ -22,6 +22,7 @@ class UserAuthor(CamelModel):
     handle: str
     display_name: str
     avatar: Optional[AvatarVariants] = None
+    followed_by_viewer: bool = False
 
 
 class UserProfile(CamelModel):
@@ -36,6 +37,7 @@ class UserProfile(CamelModel):
     post_count: int = 0
     follower_count: int = 0
     following_count: int = 0
+    followed_by_viewer: bool = False
 
 
 class UserProfileResponse(CamelModel):
@@ -44,3 +46,13 @@ class UserProfileResponse(CamelModel):
     { "item": { ... } }
     """
     item: UserProfile
+
+
+class FollowResponse(CamelModel):
+    """
+    Response body for PUT /users/{id}/follow and DELETE /users/{id}/follow.
+    """
+    user_id: str
+    followed_by_viewer: bool
+    follower_count: int
+
