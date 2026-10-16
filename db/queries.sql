@@ -1,294 +1,202 @@
 -- ============================================================================
--- Social Feed Parameterized SQL Use Cases (Stage B)
--- Target Database: PostgreSQL 16+
--- Reference: docs/03_Shared_Database_Modeling_PRD.md (Deliverable 4)
+-- Easy SQL Practice Queries
+-- Based on the Social Feed schema
+-- Tables used: users, posts, post_likes, follows, post_media
 -- ============================================================================
 
+
 -- ============================================================================
--- 1. HOME FEED (Core Public Feed of Original Posts)
--- Purpose: Returns newest original posts across all users with author info,
---          accurate reaction/reply counts, and viewer reaction state.
--- Ordering: (created_at DESC, id DESC) total ordering.
--- Keyset Pagination: (p.created_at, p.id) < ($1, $2). Fetches limit + 1.
--- Parameters:
---   $1: cursor_created_at TIMESTAMPTZ(3) (NULL for Page 1)
---   $2: cursor_id         UUID           (NULL for Page 1)
---   $3: limit_count       INTEGER        (Page size, e.g. 10)
---   $4: viewer_id         UUID           (Current viewer UUID)
+-- 1. GET ALL POSTS WITH THEIR AUTHOR
+-- Concept: JOIN
+-- Question: Show every post along with the name/handle of the user who posted it.
 -- ============================================================================
-PREPARE get_home_feed (timestamptz, uuid, integer, uuid) AS
+
 SELECT
-    p.id,
-    p.kind,
+    p.id AS post_id,
     p.text,
-    p.created_at,
-    u.id AS author_id,
-    u.handle AS author_handle,
-    u.display_name AS author_display_name,
-    u.avatar_small_url AS author_avatar_small_url,
-    u.avatar_large_url AS author_avatar_large_url,
-    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
-    (SELECT COUNT(*) FROM posts r WHERE r.reply_to_id = p.id) AS reply_count,
-    EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $4) AS liked_by_viewer
+    u.id AS user_id,
+    u.handle
 FROM posts p
-JOIN users u ON u.id = p.author_id
-WHERE p.kind = 'original'
-  AND (
-      $1::timestamptz IS NULL
-      OR (p.created_at, p.id) < ($1, $2)
-  )
-ORDER BY p.created_at DESC, p.id DESC
-LIMIT $3 + 1;
+JOIN users u
+    ON p.author_id = u.id;
 
 
 -- ============================================================================
--- 2. POST DETAIL
--- Purpose: Returns complete details for a single post by UUID, including author,
---          accurate reaction/reply counts, viewer state, and referenced content.
--- Parameters:
---   $1: post_id   UUID (Post UUID to retrieve)
---   $2: viewer_id UUID (Current viewer UUID)
+-- 2. GET ONE USER'S POSTS
+-- Concept: WHERE
+-- Question: Show all original posts written by one particular user.
+-- Replace the UUID below with the required user ID.
 -- ============================================================================
-PREPARE get_post_detail (uuid, uuid) AS
+
 SELECT
-    p.id,
-    p.kind,
+    p.id AS post_id,
     p.text,
-    p.created_at,
-    p.reply_to_id,
-    p.repost_of_id,
-    u.id AS author_id,
-    u.handle AS author_handle,
-    u.display_name AS author_display_name,
-    u.avatar_small_url AS author_avatar_small_url,
-    u.avatar_large_url AS author_avatar_large_url,
-    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
-    (SELECT COUNT(*) FROM posts r WHERE r.reply_to_id = p.id) AS reply_count,
-    EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $2) AS liked_by_viewer,
-    ref_u.handle AS referenced_author_handle,
-    ref_p.text AS referenced_text
+    p.created_at
 FROM posts p
-JOIN users u ON u.id = p.author_id
-LEFT JOIN posts ref_p ON ref_p.id = p.repost_of_id
-LEFT JOIN users ref_u ON ref_u.id = ref_p.author_id
-WHERE p.id = $1;
+WHERE p.author_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  AND p.kind = 'original';
 
 
 -- ============================================================================
--- 3. DIRECT REPLIES
--- Purpose: Returns chronological direct replies for a given original post ID.
---          Does not return replies to replies (single-level hierarchy).
--- Parameters:
---   $1: parent_post_id    UUID
---   $2: cursor_created_at TIMESTAMPTZ(3) (NULL for Page 1)
---   $3: cursor_id         UUID           (NULL for Page 1)
---   $4: limit_count       INTEGER
---   $5: viewer_id         UUID
+-- 3. GET EACH POST AND ITS NUMBER OF LIKES
+-- Concept: LEFT JOIN + GROUP BY
+-- Question: For one particular user, show each of their posts and
+--           the number of likes on each post.
 -- ============================================================================
-PREPARE get_direct_replies (uuid, timestamptz, uuid, integer, uuid) AS
+
 SELECT
-    r.id,
-    r.kind,
-    r.text,
-    r.created_at,
-    r.reply_to_id,
-    u.id AS author_id,
-    u.handle AS author_handle,
-    u.display_name AS author_display_name,
-    u.avatar_small_url AS author_avatar_small_url,
-    u.avatar_large_url AS author_avatar_large_url,
-    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = r.id) AS like_count,
-    EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = r.id AND pl.user_id = $5) AS liked_by_viewer
-FROM posts r
-JOIN users u ON u.id = r.author_id
-WHERE r.kind = 'reply'
-  AND r.reply_to_id = $1
-  AND (
-      $2::timestamptz IS NULL
-      OR (r.created_at, r.id) < ($2, $3)
-  )
-ORDER BY r.created_at DESC, r.id DESC
-LIMIT $4 + 1;
-
-
--- ============================================================================
--- 4. PROFILE MEDIA
--- Purpose: Returns ordered image attachments for a user's original posts.
--- Parameters:
---   $1: user_id           UUID
---   $2: cursor_created_at TIMESTAMPTZ(3) (NULL for Page 1)
---   $3: cursor_id         UUID           (NULL for Page 1)
---   $4: limit_count       INTEGER
--- ============================================================================
-PREPARE get_profile_media (uuid, timestamptz, uuid, integer) AS
-SELECT
-    pm.id,
-    pm.post_id,
-    pm.position,
-    pm.alt_text,
-    pm.width,
-    pm.height,
-    pm.small_url,
-    pm.large_url,
-    pm.created_at
-FROM post_media pm
-JOIN posts p ON p.id = pm.post_id
-WHERE p.author_id = $1
+    p.id AS post_id,
+    COUNT(pl.user_id) AS no_of_likes
+FROM posts p
+LEFT JOIN post_likes pl
+    ON p.id = pl.post_id
+WHERE p.author_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   AND p.kind = 'original'
-  AND (
-      $2::timestamptz IS NULL
-      OR (pm.created_at, pm.id) < ($2, $3)
-  )
-ORDER BY pm.created_at DESC, pm.id DESC
-LIMIT $4 + 1;
+GROUP BY p.id;
 
 
 -- ============================================================================
--- 5. PROFILE STATS
--- Purpose: Returns authoritative profile statistics without count inflation.
--- Parameters:
---   $1: user_id UUID
+-- 4. GET USERS AND THEIR POST COUNT
+-- Concept: LEFT JOIN + GROUP BY
+-- Question: Show every user and how many posts they have.
+-- Users with zero posts should also appear.
 -- ============================================================================
-PREPARE get_profile_stats (uuid) AS
+
 SELECT
-    u.id,
+    u.id AS user_id,
     u.handle,
-    u.display_name,
-    u.bio,
-    u.avatar_small_url,
-    u.avatar_large_url,
-    u.created_at,
-    (SELECT COUNT(*) FROM posts p WHERE p.author_id = u.id AND p.kind = 'original') AS post_count,
-    (SELECT COUNT(*) FROM posts p WHERE p.author_id = u.id AND p.kind = 'reply') AS reply_count,
-    (SELECT COUNT(*) FROM posts p WHERE p.author_id = u.id AND p.kind = 'repost') AS repost_count,
-    (SELECT COUNT(*) FROM posts p WHERE p.author_id = u.id) AS total_posts,
-    (SELECT COUNT(*) FROM follows f WHERE f.following_id = u.id) AS follower_count,
-    (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id) AS following_count
+    COUNT(p.id) AS no_of_posts
 FROM users u
-WHERE u.id = $1;
+LEFT JOIN posts p
+    ON u.id = p.author_id
+   AND p.kind = 'original'
+GROUP BY u.id, u.handle;
 
 
 -- ============================================================================
--- 6. LIKE TOTALS (Batch Reaction Aggregation)
--- Purpose: Computes like counts for an arbitrary batch of post IDs.
--- Parameters:
---   $1: post_ids UUID[] (Array of post UUIDs)
+-- 5. GET POSTS HAVING MORE THAN 2 LIKES
+-- Concept: JOIN + GROUP BY + HAVING
+-- Question: Show posts that have more than 2 likes.
 -- ============================================================================
-PREPARE get_like_totals (uuid[]) AS
+
 SELECT
-    target.post_id,
-    COUNT(pl.user_id) AS like_count
-FROM unnest($1) AS target(post_id)
-LEFT JOIN post_likes pl ON pl.post_id = target.post_id
-GROUP BY target.post_id;
+    p.id AS post_id,
+    COUNT(pl.user_id) AS no_of_likes
+FROM posts p
+LEFT JOIN post_likes pl
+    ON p.id = pl.post_id
+GROUP BY p.id
+HAVING COUNT(pl.user_id) > 2;
 
 
 -- ============================================================================
--- 7. VIEWER STATE (Batch Viewer Reaction Check)
--- Purpose: Determines whether a viewer has liked each post in a batch.
--- Parameters:
---   $1: viewer_id UUID
---   $2: post_ids  UUID[]
+-- 6. FIND THE MOST-LIKED POST
+-- Concept: GROUP BY + ORDER BY + LIMIT
+-- Question: Find the post that has the highest number of likes.
 -- ============================================================================
-PREPARE get_viewer_state (uuid, uuid[]) AS
+
 SELECT
-    target.post_id,
-    (pl.user_id IS NOT NULL) AS liked_by_viewer
-FROM unnest($2) AS target(post_id)
-LEFT JOIN post_likes pl ON pl.post_id = target.post_id AND pl.user_id = $1;
-
-
--- ============================================================================
--- 8. FOLLOWING FEED EXERCISE
--- Purpose: Returns original posts authored by users followed by the viewer.
--- Parameters:
---   $1: viewer_id         UUID
---   $2: cursor_created_at TIMESTAMPTZ(3) (NULL for Page 1)
---   $3: cursor_id         UUID           (NULL for Page 1)
---   $4: limit_count       INTEGER
--- ============================================================================
-PREPARE get_following_feed (uuid, timestamptz, uuid, integer) AS
-SELECT
-    p.id,
-    p.kind,
+    p.id AS post_id,
     p.text,
-    p.created_at,
-    u.id AS author_id,
-    u.handle AS author_handle,
-    u.display_name AS author_display_name,
-    u.avatar_small_url AS author_avatar_small_url,
-    u.avatar_large_url AS author_avatar_large_url,
-    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
-    (SELECT COUNT(*) FROM posts r WHERE r.reply_to_id = p.id) AS reply_count,
-    EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $1) AS liked_by_viewer
+    COUNT(pl.user_id) AS no_of_likes
 FROM posts p
-JOIN follows f ON f.following_id = p.author_id AND f.follower_id = $1
-JOIN users u ON u.id = p.author_id
-WHERE p.kind = 'original'
-  AND (
-      $2::timestamptz IS NULL
-      OR (p.created_at, p.id) < ($2, $3)
-  )
-ORDER BY p.created_at DESC, p.id DESC
-LIMIT $4 + 1;
+LEFT JOIN post_likes pl
+    ON p.id = pl.post_id
+GROUP BY p.id, p.text
+ORDER BY no_of_likes DESC
+LIMIT 1;
 
 
 -- ============================================================================
--- 9. SEARCH (Case-Insensitive Substring Match on Originals)
--- Purpose: Case-insensitive literal substring search on original post text.
---          Escapes SQL wildcard characters ('%' and '_') to treat input literally.
--- Parameters:
---   $1: search_term       TEXT
---   $2: cursor_created_at TIMESTAMPTZ(3) (NULL for Page 1)
---   $3: cursor_id         UUID           (NULL for Page 1)
---   $4: limit_count       INTEGER
---   $5: viewer_id         UUID
+-- 7. FIND THE AVERAGE NUMBER OF LIKES PER POST
+-- Concept: Subquery + AVG
+-- Question: Find the average number of likes received by a post.
 -- ============================================================================
-PREPARE search_posts (text, timestamptz, uuid, integer, uuid) AS
+
 SELECT
-    p.id,
-    p.kind,
-    p.text,
-    p.created_at,
-    u.id AS author_id,
-    u.handle AS author_handle,
-    u.display_name AS author_display_name,
-    u.avatar_small_url AS author_avatar_small_url,
-    u.avatar_large_url AS author_avatar_large_url,
-    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
-    (SELECT COUNT(*) FROM posts r WHERE r.reply_to_id = p.id) AS reply_count,
-    EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $5) AS liked_by_viewer
-FROM posts p
-JOIN users u ON u.id = p.author_id
-WHERE p.kind = 'original'
-  AND p.text ILIKE '%' || replace(replace(trim($1), '_', '\_'), '%', '\%') || '%'
-  AND (
-      $2::timestamptz IS NULL
-      OR (p.created_at, p.id) < ($2, $3)
-  )
-ORDER BY p.created_at DESC, p.id DESC
-LIMIT $4 + 1;
+    AVG(like_count) AS average_likes
+FROM (
+    SELECT
+        p.id,
+        COUNT(pl.user_id) AS like_count
+    FROM posts p
+    LEFT JOIN post_likes pl
+        ON p.id = pl.post_id
+    GROUP BY p.id
+) AS post_like_counts;
 
 
 -- ============================================================================
--- 10. REPOST LOOKUP
--- Purpose: Checks if an author has reposted an original and retrieves details.
--- Parameters:
---   $1: author_id        UUID
---   $2: original_post_id UUID
+-- 8. FIND USERS WHO HAVE NO POSTS
+-- Concept: LEFT JOIN + IS NULL
+-- Question: Find users who have never created an original post.
 -- ============================================================================
-PREPARE get_repost_lookup (uuid, uuid) AS
+
 SELECT
-    p.id AS repost_id,
-    p.author_id,
-    p.repost_of_id,
-    p.created_at AS reposted_at,
-    orig.id AS original_id,
-    orig.text AS original_text,
-    orig_u.handle AS original_author_handle
+    u.id AS user_id,
+    u.handle
+FROM users u
+LEFT JOIN posts p
+    ON u.id = p.author_id
+   AND p.kind = 'original'
+WHERE p.id IS NULL;
+
+
+-- ============================================================================
+-- 9. FIND POSTS WITH MORE LIKES THAN THE AVERAGE
+-- Concept: Subquery
+-- Question: Show posts whose number of likes is greater than
+--           the average number of likes across all posts.
+-- ============================================================================
+
+SELECT
+    p.id AS post_id,
+    COUNT(pl.user_id) AS no_of_likes
 FROM posts p
-JOIN posts orig ON orig.id = p.repost_of_id
-JOIN users orig_u ON orig_u.id = orig.author_id
-WHERE p.kind = 'repost'
-  AND p.author_id = $1
-  AND p.repost_of_id = $2;
+LEFT JOIN post_likes pl
+    ON p.id = pl.post_id
+GROUP BY p.id
+HAVING COUNT(pl.user_id) > (
+    SELECT AVG(like_count)
+    FROM (
+        SELECT
+            p2.id,
+            COUNT(pl2.user_id) AS like_count
+        FROM posts p2
+        LEFT JOIN post_likes pl2
+            ON p2.id = pl2.post_id
+        GROUP BY p2.id
+    ) AS average_likes
+);
+
+
+-- ============================================================================
+-- 10. FIND FOLLOWERS OF ONE PARTICULAR USER
+-- Concept: JOIN
+-- Question: Show the users who follow one particular user.
+-- Replace the UUID below with the required user's ID.
+-- ============================================================================
+
+SELECT
+    u.id AS follower_id,
+    u.handle AS follower_handle
+FROM follows f
+JOIN users u
+    ON f.follower_id = u.id
+WHERE f.following_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+
+-- ============================================================================
+-- QUICK CONCEPT SUMMARY
+-- ============================================================================
+-- 1. JOIN
+-- 2. WHERE
+-- 3. LEFT JOIN + GROUP BY
+-- 4. LEFT JOIN + GROUP BY
+-- 5. GROUP BY + HAVING
+-- 6. GROUP BY + ORDER BY + LIMIT
+-- 7. Subquery + AVG
+-- 8. LEFT JOIN + IS NULL
+-- 9. Subquery + GROUP BY + HAVING
+-- 10. JOIN
+-- ============================================================================

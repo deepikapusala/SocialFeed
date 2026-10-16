@@ -2,12 +2,21 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TopBar } from './components/TopBar/TopBar';
 import { PhotoGrid } from './components/PhotoGrid/PhotoGrid';
 import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
-import { fetchFeedFromApi, toggleFollowApi } from './utils/api';
+import { fetchFeedFromApi, toggleFollowApi, fetchPostDetailApi } from './utils/api';
 import './App.css';
 
 /**
+ * Helper to extract post ID from URL path /p/:postId
+ */
+function getPostIdFromUrl() {
+  const match = window.location.pathname.match(/^\/p\/([^/]+)/);
+  return match ? match[1] : null;
+}
+
+/**
  * Root Application component.
- * Consumes the Stage A FastAPI /feed endpoint with opaque cursor pagination.
+ * Consumes the Stage A FastAPI /feed endpoint with opaque cursor pagination
+ * and supports deep linking / URL routing (/p/:postId).
  */
 export function App() {
   const [posts, setPosts] = useState([]);
@@ -34,6 +43,68 @@ export function App() {
   const handleToggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
+
+  /**
+   * Handle selecting a post and updating URL to /p/:postId
+   */
+  const handleSelectPost = useCallback((post) => {
+    setSelectedPost(post);
+    if (post && post.id) {
+      const targetUrl = `/p/${post.id}`;
+      if (window.location.pathname !== targetUrl) {
+        window.history.pushState({ postId: post.id }, '', targetUrl);
+      }
+    }
+  }, []);
+
+  /**
+   * Handle closing post modal and reverting URL to /
+   */
+  const handleClosePost = useCallback(() => {
+    setSelectedPost(null);
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
+  }, []);
+
+  // Listen for browser Back / Forward buttons (popstate event)
+  useEffect(() => {
+    const handlePopState = async () => {
+      const urlPostId = getPostIdFromUrl();
+      if (urlPostId) {
+        const matched = posts.find((p) => p.id === urlPostId);
+        if (matched) {
+          setSelectedPost(matched);
+        } else {
+          try {
+            const detail = await fetchPostDetailApi(urlPostId);
+            setSelectedPost(detail);
+          } catch (err) {
+            console.error('Failed to fetch post detail from URL:', err);
+            setSelectedPost(null);
+          }
+        }
+      } else {
+        setSelectedPost(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [posts]);
+
+  /**
+   * On initial page load: check if direct URL contains /p/:postId
+   */
+  useEffect(() => {
+    const urlPostId = getPostIdFromUrl();
+    if (urlPostId) {
+      fetchPostDetailApi(urlPostId)
+        .then((detail) => setSelectedPost(detail))
+        .catch((err) => console.error('Failed to load initial post from URL:', err));
+    }
+  }, []);
+
 
   /**
    * Toggle follow state for an author across all posts synchronously.
@@ -226,7 +297,7 @@ export function App() {
       {(!error || posts.length > 0) && (
         <PhotoGrid
           posts={filteredPosts}
-          onSelectPost={(post) => setSelectedPost(post)}
+          onSelectPost={handleSelectPost}
           onToggleFollow={handleToggleFollow}
           onLoadMore={() => loadPosts(false)}
           hasMore={cleanQuery ? false : hasMore}
@@ -251,7 +322,7 @@ export function App() {
       {selectedPost && (
         <PhotoViewer
           post={selectedPost}
-          onClose={() => setSelectedPost(null)}
+          onClose={handleClosePost}
           onUpdatePost={handleUpdatePost}
           onToggleFollow={handleToggleFollow}
         />

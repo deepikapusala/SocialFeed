@@ -254,3 +254,27 @@ export async function createReplyApi(postId, text) {
   const data = await response.json();
   return normalizePostItem(data.item);
 }
+
+/**
+ * Fetches a single post detail by ID from FastAPI GET /posts/{id} endpoint.
+ *
+ * @param {string} postId - UUID of the post.
+ * @returns {Promise<Object>}
+ */
+export async function fetchPostDetailApi(postId) {
+  const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Failed to fetch post detail (${response.status})`);
+  }
+
+  const data = await response.json();
+  return normalizePostItem(data.item);
+}
+
