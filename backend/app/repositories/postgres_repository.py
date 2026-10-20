@@ -16,6 +16,7 @@ from sqlalchemy import (
     func,
     or_,
     select,
+    update,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -23,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
 from app.common.errors import ConflictError, NotFoundError, ValidationError
-from app.models import Follow, Post, PostLike, PostMedia, User
+from app.models import Follow, Post, PostLike, PostMedia, Session, User
 
 
 class PostgresRepository:
@@ -426,7 +427,7 @@ class PostgresRepository:
             follower_count_sq.label("follower_count"),
             following_count_sq.label("following_count"),
             followed_by_viewer_sq.label("followed_by_viewer"),
-        ).where(User.id == user_uuid)
+        ).where(and_(User.id == user_uuid, User.is_active.is_(True)))
 
         result = await self._session.execute(stmt)
         row = result.first()
@@ -984,4 +985,63 @@ class PostgresRepository:
             "repostedByViewer": False,
             "repostCount": repost_count,
         }
+
+    async def update_user_profile(
+        self,
+        user_id: str,
+        fields: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Updates allowed fields on a user profile.
+        Returns the updated user profile dict or None if user not found.
+        """
+        try:
+            user_uuid = uuid.UUID(user_id)
+        except ValueError:
+            return None
+
+        user = await self._session.get(User, user_uuid)
+        if not user or not user.is_active:
+            return None
+
+        if "display_name" in fields and fields["display_name"] is not None:
+            user.display_name = fields["display_name"]
+        if "bio" in fields:
+            user.bio = fields["bio"]
+        if "avatar_small_url" in fields:
+            user.avatar_small_url = fields["avatar_small_url"]
+        if "avatar_large_url" in fields:
+            user.avatar_large_url = fields["avatar_large_url"]
+
+        await self._session.commit()
+        return await self.get_user_profile(user_id, viewer_id=user_id)
+
+    async def deactivate_user(
+        self,
+        user_id: str,
+    ) -> bool:
+        """
+        Deactivates a user account (is_active = False) and revokes active sessions.
+        Returns True if deactivated, False if user not found.
+        """
+        try:
+            user_uuid = uuid.UUID(user_id)
+        except ValueError:
+            return False
+
+        user = await self._session.get(User, user_uuid)
+        if not user or not user.is_active:
+            return False
+
+        user.is_active = False
+
+        now = datetime.now()
+        stmt = (
+            update(Session)
+            .where(and_(Session.user_id == user_uuid, Session.revoked_at.is_(None)))
+            .values(revoked_at=now)
+        )
+        await self._session.execute(stmt)
+        await self._session.commit()
+        return True
 

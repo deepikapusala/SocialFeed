@@ -8,12 +8,12 @@ text search across original posts, and post/like write operations.
 import uuid
 from typing import Any, Dict, List, Optional
 from app.common.cursor import decode_cursor, encode_cursor, InvalidCursorError
-from app.common.errors import NotFoundError, ValidationError
+from app.common.errors import ForbiddenError, NotFoundError, ValidationError
 from app.repositories.base import SocialRepositoryProtocol
 from app.schemas.common import PaginatedResponse
 from app.schemas.media import MediaItem
 from app.schemas.post import PostItem, PostDetailResponse, FeedResponse, LikeResponse, RepostResponse
-from app.schemas.user import UserProfile, UserProfileResponse
+from app.schemas.user import ProfileUpdateRequest, UserProfile, UserProfileResponse
 
 
 class SocialService:
@@ -68,6 +68,63 @@ class SocialService:
             raise NotFoundError(f"User with id '{clean_user_id}' not found.")
 
         return UserProfileResponse(item=UserProfile(**raw_user))
+
+    async def update_profile(
+        self,
+        actor_id: str,
+        target_user_id: str,
+        req: ProfileUpdateRequest,
+    ) -> UserProfileResponse:
+        """
+        Updates allowed profile fields (display_name, bio, avatars).
+        Enforces strict authorization: only the account owner may update.
+        """
+        clean_actor_id = self._validate_uuid(actor_id, "actor_id")
+        clean_target_id = self._validate_uuid(target_user_id, "id")
+
+        if clean_actor_id != clean_target_id:
+            raise ForbiddenError(
+                "You are not authorized to update another member's profile",
+                details=[{"field": "id", "reason": "forbidden_cross_user_mutation"}],
+            )
+
+        fields: Dict[str, Any] = {}
+        if req.display_name is not None:
+            fields["display_name"] = req.display_name
+        if req.bio is not None:
+            fields["bio"] = req.bio
+        if req.avatar_small_url is not None:
+            fields["avatar_small_url"] = req.avatar_small_url
+        if req.avatar_large_url is not None:
+            fields["avatar_large_url"] = req.avatar_large_url
+
+        raw_user = await self._repository.update_user_profile(clean_target_id, fields)
+        if not raw_user:
+            raise NotFoundError(f"User with id '{clean_target_id}' not found.")
+
+        return UserProfileResponse(item=UserProfile(**raw_user))
+
+    async def deactivate_account(
+        self,
+        actor_id: str,
+        target_user_id: str,
+    ) -> None:
+        """
+        Deactivates account and revokes all active sessions.
+        Enforces strict authorization: only the account owner may deactivate.
+        """
+        clean_actor_id = self._validate_uuid(actor_id, "actor_id")
+        clean_target_id = self._validate_uuid(target_user_id, "id")
+
+        if clean_actor_id != clean_target_id:
+            raise ForbiddenError(
+                "You are not authorized to deactivate another member's account",
+                details=[{"field": "id", "reason": "forbidden_cross_user_mutation"}],
+            )
+
+        success = await self._repository.deactivate_user(clean_target_id)
+        if not success:
+            raise NotFoundError(f"User with id '{clean_target_id}' not found.")
 
     async def follow_user(self, follower_id: str, target_user_id: str) -> Dict[str, Any]:
         """

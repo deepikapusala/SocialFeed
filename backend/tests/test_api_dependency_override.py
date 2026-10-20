@@ -68,6 +68,7 @@ class MockTestRepository(SocialRepositoryProtocol):
     async def get_user_profile(
         self,
         user_id: str,
+        viewer_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         return {
             "id": user_id,

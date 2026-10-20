@@ -140,3 +140,24 @@ class SocialRepositoryProtocol(Protocol):
         Returns Dict with postId, repostedByViewer, repostCount.
         """
         ...
+
+    async def update_user_profile(
+        self,
+        user_id: str,
+        fields: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Updates allowed fields on a user profile.
+        Returns the updated user profile dict or None if user not found.
+        """
+        ...
+
+    async def deactivate_user(
+        self,
+        user_id: str,
+    ) -> bool:
+        """
+        Deactivates a user account and revokes active sessions.
+        Returns True if deactivated, False if user not found.
+        """
+        ...

@@ -7,7 +7,7 @@ Reference: db/schema.sql
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import CheckConstraint, DateTime, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from app.models.post import Post
     from app.models.like import PostLike
     from app.models.follow import Follow
+    from app.models.session import Session
 
 
 class User(Base):
@@ -53,6 +54,16 @@ class User(Base):
         server_default=func.current_timestamp(),
         nullable=False,
     )
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=func.true(),
+        nullable=False,
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -74,6 +85,11 @@ class User(Base):
     )
 
     # Relationships
+    sessions: Mapped[List["Session"]] = relationship(
+        "Session",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     posts: Mapped[List["Post"]] = relationship(
         "Post",
         back_populates="author",

@@ -44,15 +44,69 @@ def get_repository(
     return PostgresRepository(session=session)
 
 
-def get_current_actor_id(
+from app.common.errors import UnauthorizedError
+from app.models import User
+from app.services.auth_service import AuthService
+
+
+def get_auth_service(
+    session: AsyncSession = Depends(get_async_session),
+) -> AuthService:
+    """Provides the AuthService bound to the current request AsyncSession."""
+    return AuthService(session=session)
+
+
+async def get_required_actor(
     request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> User:
+    """
+    Strict dependency for authenticated routes.
+    Extracts Bearer token, verifies active session, and returns User ORM instance.
+    Raises 401 Unauthorized if missing, malformed, expired, or revoked.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise UnauthorizedError(
+            "Authentication required",
+            details=[{"field": "Authorization", "reason": "missing_bearer_token"}],
+        )
+
+    raw_token = auth_header[7:].strip()
+    if not raw_token:
+        raise UnauthorizedError(
+            "Authentication required",
+            details=[{"field": "Authorization", "reason": "empty_bearer_token"}],
+        )
+
+    return await auth_service.verify_session_token(raw_token)
+
+
+async def get_required_actor_id(
+    actor: User = Depends(get_required_actor),
+) -> str:
+    """Returns the verified actor UUID string for strictly authenticated routes."""
+    return str(actor.id)
+
+
+async def get_current_actor_id(
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
     settings: Settings = Depends(get_settings),
 ) -> str:
     """
-    Resolves the development identity actor ID.
-    Prioritizes x-viewer-id header if present and valid UUID,
-    otherwise falls back to DEMO_USER_ID from settings.
+    Resolves the actor ID for routes that support both authenticated and development actors.
+    1. If 'Authorization: Bearer <token>' is provided, resolves actor from verified session.
+    2. If 'x-viewer-id' header is provided with valid UUID (tests), returns it.
+    3. Falls back to DEMO_USER_ID from settings for Stage A/C V1 backwards compatibility.
     """
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        raw_token = auth_header[7:].strip()
+        if raw_token:
+            user = await auth_service.verify_session_token(raw_token)
+            return str(user.id)
+
     header_val = request.headers.get("x-viewer-id")
     if header_val:
         try:
@@ -60,6 +114,7 @@ def get_current_actor_id(
             return header_val
         except ValueError:
             pass
+
     return settings.DEMO_USER_ID
 
 

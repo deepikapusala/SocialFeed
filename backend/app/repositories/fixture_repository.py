@@ -363,3 +363,37 @@ class FixtureRepository:
             "repostedByViewer": False,
             "repostCount": repost_count,
         }
+
+    async def update_user_profile(
+        self,
+        user_id: str,
+        fields: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        await self._simulate_io()
+        user = next((u for u in self._users if u["id"] == user_id), None)
+        if not user:
+            return None
+        if "display_name" in fields and fields["display_name"] is not None:
+            user["displayName"] = fields["display_name"]
+        if "bio" in fields:
+            user["bio"] = fields["bio"]
+        if "avatar_small_url" in fields:
+            if not user.get("avatar"):
+                user["avatar"] = {}
+            user["avatar"]["smallUrl"] = fields["avatar_small_url"]
+        if "avatar_large_url" in fields:
+            if not user.get("avatar"):
+                user["avatar"] = {}
+            user["avatar"]["largeUrl"] = fields["avatar_large_url"]
+        return await self.get_user_profile(user_id, viewer_id=user_id)
+
+    async def deactivate_user(
+        self,
+        user_id: str,
+    ) -> bool:
+        await self._simulate_io()
+        user = next((u for u in self._users if u["id"] == user_id), None)
+        if not user:
+            return False
+        user["isActive"] = False
+        return True

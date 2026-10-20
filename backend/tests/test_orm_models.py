@@ -9,10 +9,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.models import Base, User, Post, PostMedia, PostLike, Follow
 
 
-def test_metadata_contains_all_five_tables():
-    """Verify that exactly the 5 required domain tables are registered in Base.metadata."""
+def test_metadata_contains_all_tables():
+    """Verify that required domain tables and sessions are registered in Base.metadata."""
     table_names = set(Base.metadata.tables.keys())
-    expected_tables = {"users", "posts", "post_media", "post_likes", "follows"}
+    expected_tables = {"users", "posts", "post_media", "post_likes", "follows", "sessions"}
     assert table_names == expected_tables, f"Metadata tables mismatch. Got: {table_names}"
 
 

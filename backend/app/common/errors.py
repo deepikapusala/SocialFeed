@@ -19,6 +19,8 @@ from typing import List, Dict, Any, Optional
 CODE_VALIDATION_ERROR = "VALIDATION_ERROR"
 CODE_NOT_FOUND = "NOT_FOUND"
 CODE_CONFLICT = "CONFLICT"
+CODE_UNAUTHORIZED = "UNAUTHORIZED"
+CODE_FORBIDDEN = "FORBIDDEN"
 CODE_SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
 CODE_INTERNAL_ERROR = "INTERNAL_ERROR"
 
@@ -85,6 +87,38 @@ class ConflictError(AppException):
             code=CODE_CONFLICT,
             message=message,
             status_code=409,
+            details=details,
+        )
+
+
+class UnauthorizedError(AppException):
+    """Raised when authentication is missing, invalid, expired, or revoked (401)."""
+
+    def __init__(
+        self,
+        message: str = "Authentication required",
+        details: Optional[List[Dict[str, Any]]] = None,
+    ):
+        super().__init__(
+            code=CODE_UNAUTHORIZED,
+            message=message,
+            status_code=401,
+            details=details,
+        )
+
+
+class ForbiddenError(AppException):
+    """Raised when the authenticated actor lacks permission for this resource (403)."""
+
+    def __init__(
+        self,
+        message: str = "Access forbidden",
+        details: Optional[List[Dict[str, Any]]] = None,
+    ):
+        super().__init__(
+            code=CODE_FORBIDDEN,
+            message=message,
+            status_code=403,
             details=details,
         )
 
