@@ -52,10 +52,11 @@ class SocialRepositoryProtocol(Protocol):
         self,
         follower_id: str,
         following_id: str,
-    ) -> Tuple[bool, int]:
+    ) -> Tuple[str, bool, int]:
         """
-        Establishes a follow edge between follower_id and following_id.
-        Returns (followedByViewer, updatedFollowerCount).
+        Establishes or confirms a follow edge between follower_id and following_id.
+        Desired-state and idempotent.
+        Returns (relationshipStatus, followedByViewer, updatedFollowerCount).
         """
         ...
 
@@ -63,10 +64,57 @@ class SocialRepositoryProtocol(Protocol):
         self,
         follower_id: str,
         following_id: str,
+    ) -> Tuple[str, bool, int]:
+        """
+        Removes a follow edge or cancels pending request.
+        Desired-state and idempotent.
+        Returns (relationshipStatus, followedByViewer, updatedFollowerCount).
+        """
+        ...
+
+    async def accept_follow_request(
+        self,
+        target_id: str,
+        requester_id: str,
     ) -> Tuple[bool, int]:
         """
-        Removes a follow edge between follower_id and following_id.
-        Returns (followedByViewer, updatedFollowerCount).
+        Accepts a pending follow request.
+        Returns (isAccepted, updatedFollowerCount).
+        """
+        ...
+
+    async def reject_follow_request(
+        self,
+        target_id: str,
+        requester_id: str,
+    ) -> bool:
+        """
+        Rejects (deletes) a pending follow request.
+        Returns True if rejected, False if not found.
+        """
+        ...
+
+    async def list_followers(
+        self,
+        user_id: str,
+        viewer_id: Optional[str] = None,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns bounded, cursor-paginated active followers of user_id.
+        """
+        ...
+
+    async def list_following(
+        self,
+        user_id: str,
+        viewer_id: Optional[str] = None,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns bounded, cursor-paginated active followees of user_id.
         """
         ...
 

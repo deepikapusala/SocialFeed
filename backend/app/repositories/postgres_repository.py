@@ -400,12 +400,12 @@ class PostgresRepository:
         )
         follower_count_sq = (
             select(func.count(Follow.follower_id))
-            .where(Follow.following_id == user_uuid)
+            .where(and_(Follow.following_id == user_uuid, Follow.status == "accepted"))
             .scalar_subquery()
         )
         following_count_sq = (
             select(func.count(Follow.following_id))
-            .where(Follow.follower_id == user_uuid)
+            .where(and_(Follow.follower_id == user_uuid, Follow.status == "accepted"))
             .scalar_subquery()
         )
         followed_by_viewer_sq = (
@@ -415,10 +415,22 @@ class PostgresRepository:
                         and_(
                             Follow.follower_id == viewer_uuid,
                             Follow.following_id == user_uuid,
+                            Follow.status == "accepted",
                         )
                     )
                 )
             ).scalar_subquery() if viewer_uuid else select(False).scalar_subquery()
+        )
+        relationship_status_sq = (
+            select(Follow.status)
+            .where(
+                and_(
+                    Follow.follower_id == viewer_uuid,
+                    Follow.following_id == user_uuid,
+                )
+            )
+            .limit(1)
+            .scalar_subquery() if viewer_uuid else select(None).scalar_subquery()
         )
 
         stmt = select(
@@ -427,6 +439,7 @@ class PostgresRepository:
             follower_count_sq.label("follower_count"),
             following_count_sq.label("following_count"),
             followed_by_viewer_sq.label("followed_by_viewer"),
+            relationship_status_sq.label("relationship_status"),
         ).where(and_(User.id == user_uuid, User.is_active.is_(True)))
 
         result = await self._session.execute(stmt)
@@ -434,8 +447,8 @@ class PostgresRepository:
         if not row:
             return None
 
-        user, post_cnt, follower_cnt, following_cnt, followed_by_viewer = (
-            row[0], row[1] or 0, row[2] or 0, row[3] or 0, bool(row[4])
+        user, post_cnt, follower_cnt, following_cnt, followed_by_viewer, rel_status = (
+            row[0], row[1] or 0, row[2] or 0, row[3] or 0, bool(row[4]), row[5] or "none"
         )
         avatar = None
         if user.avatar_small_url or user.avatar_large_url:
@@ -454,6 +467,8 @@ class PostgresRepository:
             "followerCount": follower_cnt,
             "followingCount": following_cnt,
             "followedByViewer": followed_by_viewer,
+            "isPrivate": user.is_private,
+            "relationshipStatus": rel_status,
         }
 
     async def list_direct_replies(
@@ -861,6 +876,7 @@ class PostgresRepository:
                     and_(
                         Follow.follower_id == follower_uuid,
                         Follow.following_id == following_uuid,
+                        Follow.status == "accepted",
                     )
                 )
             )
@@ -868,7 +884,7 @@ class PostgresRepository:
         result = await self._session.execute(stmt)
         return bool(result.scalar())
 
-    async def follow_user(self, follower_id: str, following_id: str) -> Tuple[bool, int]:
+    async def follow_user(self, follower_id: str, following_id: str) -> Tuple[str, bool, int]:
         try:
             follower_uuid = uuid.UUID(follower_id)
             following_uuid = uuid.UUID(following_id)
@@ -878,9 +894,11 @@ class PostgresRepository:
         if follower_uuid == following_uuid:
             raise ValidationError("Self-follow is prohibited.", details=[{"reason": "self_follow_prohibited"}], status_code=400)
 
-        target_exists = await self.user_exists(following_id)
-        if not target_exists:
+        target_user = await self._session.get(User, following_uuid)
+        if not target_user or not target_user.is_active:
             raise NotFoundError("Target user not found.", details=[{"field": "followingId", "reason": "not_found"}])
+
+        desired_status = "pending" if target_user.is_private else "accepted"
 
         try:
             stmt = (
@@ -888,6 +906,7 @@ class PostgresRepository:
                 .values(
                     follower_id=follower_uuid,
                     following_id=following_uuid,
+                    status=desired_status,
                 )
                 .on_conflict_do_nothing(index_elements=["follower_id", "following_id"])
             )
@@ -897,12 +916,28 @@ class PostgresRepository:
             await self._session.rollback()
             raise ConflictError("Follow relation conflict.", details=[{"reason": "duplicate_follow"}]) from exc
 
-        count_stmt = select(func.count(Follow.follower_id)).where(Follow.following_id == following_uuid)
+        # Read actual row status (whether newly inserted or already existing)
+        status_stmt = select(Follow.status).where(
+            and_(
+                Follow.follower_id == follower_uuid,
+                Follow.following_id == following_uuid,
+            )
+        )
+        res_status = await self._session.execute(status_stmt)
+        actual_status = res_status.scalar() or desired_status
+
+        count_stmt = select(func.count(Follow.follower_id)).where(
+            and_(
+                Follow.following_id == following_uuid,
+                Follow.status == "accepted",
+            )
+        )
         res = await self._session.execute(count_stmt)
         follower_count = res.scalar() or 0
-        return True, follower_count
+        followed_by_viewer = (actual_status == "accepted")
+        return actual_status, followed_by_viewer, follower_count
 
-    async def unfollow_user(self, follower_id: str, following_id: str) -> Tuple[bool, int]:
+    async def unfollow_user(self, follower_id: str, following_id: str) -> Tuple[str, bool, int]:
         try:
             follower_uuid = uuid.UUID(follower_id)
             following_uuid = uuid.UUID(following_id)
@@ -922,10 +957,228 @@ class PostgresRepository:
         await self._session.execute(stmt)
         await self._session.commit()
 
-        count_stmt = select(func.count(Follow.follower_id)).where(Follow.following_id == following_uuid)
+        count_stmt = select(func.count(Follow.follower_id)).where(
+            and_(
+                Follow.following_id == following_uuid,
+                Follow.status == "accepted",
+            )
+        )
         res = await self._session.execute(count_stmt)
         follower_count = res.scalar() or 0
-        return False, follower_count
+        return "none", False, follower_count
+
+    async def accept_follow_request(
+        self,
+        target_id: str,
+        requester_id: str,
+    ) -> Tuple[bool, int]:
+        try:
+            target_uuid = uuid.UUID(target_id)
+            requester_uuid = uuid.UUID(requester_id)
+        except ValueError as e:
+            raise ValidationError("Invalid UUID format.", details=[{"reason": "invalid_uuid"}]) from e
+
+        stmt = (
+            update(Follow)
+            .where(
+                and_(
+                    Follow.follower_id == requester_uuid,
+                    Follow.following_id == target_uuid,
+                    Follow.status == "pending",
+                )
+            )
+            .values(status="accepted")
+        )
+        res = await self._session.execute(stmt)
+        await self._session.commit()
+        is_accepted = bool(res.rowcount > 0)
+
+        count_stmt = select(func.count(Follow.follower_id)).where(
+            and_(
+                Follow.following_id == target_uuid,
+                Follow.status == "accepted",
+            )
+        )
+        count_res = await self._session.execute(count_stmt)
+        follower_count = count_res.scalar() or 0
+        return is_accepted, follower_count
+
+    async def reject_follow_request(
+        self,
+        target_id: str,
+        requester_id: str,
+    ) -> bool:
+        try:
+            target_uuid = uuid.UUID(target_id)
+            requester_uuid = uuid.UUID(requester_id)
+        except ValueError as e:
+            raise ValidationError("Invalid UUID format.", details=[{"reason": "invalid_uuid"}]) from e
+
+        stmt = (
+            delete(Follow)
+            .where(
+                and_(
+                    Follow.follower_id == requester_uuid,
+                    Follow.following_id == target_uuid,
+                    Follow.status == "pending",
+                )
+            )
+        )
+        res = await self._session.execute(stmt)
+        await self._session.commit()
+        return bool(res.rowcount > 0)
+
+    async def list_followers(
+        self,
+        user_id: str,
+        viewer_id: Optional[str] = None,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        user_uuid = uuid.UUID(user_id)
+        viewer_uuid = uuid.UUID(viewer_id) if viewer_id else None
+
+        followed_by_viewer_sq = (
+            select(
+                exists(
+                    select(1).where(
+                        and_(
+                            Follow.follower_id == viewer_uuid,
+                            Follow.following_id == User.id,
+                            Follow.status == "accepted",
+                        )
+                    )
+                )
+            ).scalar_subquery() if viewer_uuid else select(False).scalar_subquery()
+        )
+
+        stmt = (
+            select(
+                User,
+                Follow.created_at.label("rel_created_at"),
+                followed_by_viewer_sq.label("followed_by_viewer"),
+            )
+            .join(Follow, Follow.follower_id == User.id)
+            .where(
+                and_(
+                    Follow.following_id == user_uuid,
+                    Follow.status == "accepted",
+                    User.is_active.is_(True),
+                )
+            )
+            .order_by(Follow.created_at.desc(), User.id.desc())
+            .limit(limit + 1)
+        )
+
+        if cursor_tuple:
+            c_time, c_id = cursor_tuple
+            c_uuid = uuid.UUID(c_id)
+            stmt = stmt.where(
+                or_(
+                    Follow.created_at < c_time,
+                    and_(
+                        Follow.created_at == c_time,
+                        User.id < c_uuid,
+                    ),
+                )
+            )
+
+        res = await self._session.execute(stmt)
+        rows = res.all()
+        items = []
+        for row in rows:
+            u, rel_created_at, followed = row[0], row[1], bool(row[2])
+            avatar = None
+            if u.avatar_small_url or u.avatar_large_url:
+                avatar = {
+                    "smallUrl": u.avatar_small_url,
+                    "largeUrl": u.avatar_large_url,
+                }
+            items.append({
+                "id": str(u.id),
+                "handle": u.handle,
+                "displayName": u.display_name,
+                "avatar": avatar,
+                "followedByViewer": followed,
+                "createdAt": rel_created_at.isoformat().replace("+00:00", "Z") if hasattr(rel_created_at, "isoformat") else str(rel_created_at),
+            })
+        return items
+
+    async def list_following(
+        self,
+        user_id: str,
+        viewer_id: Optional[str] = None,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        user_uuid = uuid.UUID(user_id)
+        viewer_uuid = uuid.UUID(viewer_id) if viewer_id else None
+
+        followed_by_viewer_sq = (
+            select(
+                exists(
+                    select(1).where(
+                        and_(
+                            Follow.follower_id == viewer_uuid,
+                            Follow.following_id == User.id,
+                            Follow.status == "accepted",
+                        )
+                    )
+                )
+            ).scalar_subquery() if viewer_uuid else select(False).scalar_subquery()
+        )
+
+        stmt = (
+            select(
+                User,
+                Follow.created_at.label("rel_created_at"),
+                followed_by_viewer_sq.label("followed_by_viewer"),
+            )
+            .join(Follow, Follow.following_id == User.id)
+            .where(
+                and_(
+                    Follow.follower_id == user_uuid,
+                    Follow.status == "accepted",
+                    User.is_active.is_(True),
+                )
+            )
+            .order_by(Follow.created_at.desc(), User.id.desc())
+            .limit(limit + 1)
+        )
+
+        if cursor_tuple:
+            c_time, c_id = cursor_tuple
+            c_uuid = uuid.UUID(c_id)
+            stmt = stmt.where(
+                or_(
+                    Follow.created_at < c_time,
+                    and_(
+                        Follow.created_at == c_time,
+                        User.id < c_uuid,
+                    ),
+                )
+            )
+
+        res = await self._session.execute(stmt)
+        rows = res.all()
+        items = []
+        for row in rows:
+            u, rel_created_at, followed = row[0], row[1], bool(row[2])
+            avatar = None
+            if u.avatar_small_url or u.avatar_large_url:
+                avatar = {
+                    "smallUrl": u.avatar_small_url,
+                    "largeUrl": u.avatar_large_url,
+                }
+            items.append({
+                "id": str(u.id),
+                "handle": u.handle,
+                "displayName": u.display_name,
+                "avatar": avatar,
+                "followedByViewer": followed,
+                "createdAt": rel_created_at.isoformat().replace("+00:00", "Z") if hasattr(rel_created_at, "isoformat") else str(rel_created_at),
+            })
+        return items
 
     async def get_repost_count(self, post_id: str) -> int:
         post_uuid = uuid.UUID(post_id)
@@ -1012,6 +1265,8 @@ class PostgresRepository:
             user.avatar_small_url = fields["avatar_small_url"]
         if "avatar_large_url" in fields:
             user.avatar_large_url = fields["avatar_large_url"]
+        if "is_private" in fields and fields["is_private"] is not None:
+            user.is_private = fields["is_private"]
 
         await self._session.commit()
         return await self.get_user_profile(user_id, viewer_id=user_id)

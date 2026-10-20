@@ -7,7 +7,7 @@ Reference: db/schema.sql
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,12 @@ class Follow(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
     )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="accepted",
+        server_default="accepted",
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.current_timestamp(),
@@ -42,6 +48,7 @@ class Follow(Base):
 
     __table_args__ = (
         CheckConstraint("follower_id <> following_id", name="follows_no_self_follow_check"),
+        CheckConstraint("status IN ('pending', 'accepted')", name="follows_status_check"),
     )
 
     # Relationships

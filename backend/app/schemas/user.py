@@ -18,6 +18,7 @@ class ProfileUpdateRequest(CamelModel):
     bio: Optional[str] = Field(None, max_length=500)
     avatar_small_url: Optional[str] = Field(None, max_length=1000)
     avatar_large_url: Optional[str] = Field(None, max_length=1000)
+    is_private: Optional[bool] = Field(None)
 
     @field_validator("display_name")
     @classmethod
@@ -79,6 +80,8 @@ class UserProfile(CamelModel):
     follower_count: int = 0
     following_count: int = 0
     followed_by_viewer: bool = False
+    is_private: bool = False
+    relationship_status: str = "none"  # 'none', 'pending', 'accepted'
 
 
 class UserProfileResponse(CamelModel):
@@ -96,4 +99,27 @@ class FollowResponse(CamelModel):
     user_id: str
     followed_by_viewer: bool
     follower_count: int
+    relationship_status: str = "accepted"  # 'none', 'pending', 'accepted'
+
+
+class RelationshipUserItem(CamelModel):
+    """
+    User representation in bounded followers and following relationship lists.
+    """
+    id: str
+    handle: str
+    display_name: str
+    avatar: Optional[AvatarVariants] = None
+    followed_by_viewer: bool = False
+    created_at: Optional[str] = None
+
+
+class FollowRequestAcceptResponse(CamelModel):
+    """
+    Response schema for POST /users/requests/{requester_id}/accept.
+    """
+    requester_id: str
+    accepted: bool = True
+    follower_count: int
+
 

@@ -64,6 +64,12 @@ class User(Base):
         server_default=func.true(),
         nullable=False,
     )
+    is_private: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=func.false(),
+        nullable=False,
+    )
 
     __table_args__ = (
         CheckConstraint(

@@ -195,9 +195,16 @@ class FixtureRepository:
 
         # Count statistics accurately
         post_count = sum(1 for p in self._originals if p["authorId"] == user_id)
-        follower_count = sum(1 for f in self._follows if f["followingId"] == user_id)
-        following_count = sum(1 for f in self._follows if f["followerId"] == user_id)
+        follower_count = sum(1 for f in self._follows if f["followingId"] == user_id and f.get("status", "accepted") == "accepted")
+        following_count = sum(1 for f in self._follows if f["followerId"] == user_id and f.get("status", "accepted") == "accepted")
         followed_by_viewer = self._is_following(viewer_id, user_id) if viewer_id else False
+
+        rel_status = "none"
+        if viewer_id:
+            for f in self._follows:
+                if f["followerId"] == viewer_id and f["followingId"] == user_id:
+                    rel_status = f.get("status", "accepted")
+                    break
 
         return {
             "id": user["id"],
@@ -209,37 +216,131 @@ class FixtureRepository:
             "followerCount": follower_count,
             "followingCount": following_count,
             "followedByViewer": followed_by_viewer,
+            "isPrivate": user.get("isPrivate", False),
+            "relationshipStatus": rel_status,
         }
 
     async def follow_user(
         self,
         follower_id: str,
         following_id: str,
-    ) -> Tuple[bool, int]:
+    ) -> Tuple[str, bool, int]:
         await self._simulate_io()
         if follower_id == following_id:
             raise ValueError("Self-follow is not allowed.")
-        if not any(f["followerId"] == follower_id and f["followingId"] == following_id for f in self._follows):
+        target = self._find_user(following_id)
+        is_private = target.get("isPrivate", False) if target else False
+        desired_status = "pending" if is_private else "accepted"
+
+        existing = next((f for f in self._follows if f["followerId"] == follower_id and f["followingId"] == following_id), None)
+        if not existing:
             self._follows.append({
                 "followerId": follower_id,
                 "followingId": following_id,
+                "status": desired_status,
                 "createdAt": datetime.utcnow().isoformat() + "Z"
             })
-        follower_count = sum(1 for f in self._follows if f["followingId"] == following_id)
-        return True, follower_count
+            actual_status = desired_status
+        else:
+            actual_status = existing.get("status", desired_status)
+
+        follower_count = sum(1 for f in self._follows if f["followingId"] == following_id and f.get("status", "accepted") == "accepted")
+        return actual_status, (actual_status == "accepted"), follower_count
 
     async def unfollow_user(
         self,
         follower_id: str,
         following_id: str,
-    ) -> Tuple[bool, int]:
+    ) -> Tuple[str, bool, int]:
         await self._simulate_io()
         self._follows = [
             f for f in self._follows
             if not (f["followerId"] == follower_id and f["followingId"] == following_id)
         ]
-        follower_count = sum(1 for f in self._follows if f["followingId"] == following_id)
-        return False, follower_count
+        follower_count = sum(1 for f in self._follows if f["followingId"] == following_id and f.get("status", "accepted") == "accepted")
+        return "none", False, follower_count
+
+    async def accept_follow_request(
+        self,
+        target_id: str,
+        requester_id: str,
+    ) -> Tuple[bool, int]:
+        await self._simulate_io()
+        is_accepted = False
+        for f in self._follows:
+            if f["followerId"] == requester_id and f["followingId"] == target_id and f.get("status") == "pending":
+                f["status"] = "accepted"
+                is_accepted = True
+                break
+        follower_count = sum(1 for f in self._follows if f["followingId"] == target_id and f.get("status", "accepted") == "accepted")
+        return is_accepted, follower_count
+
+    async def reject_follow_request(
+        self,
+        target_id: str,
+        requester_id: str,
+    ) -> bool:
+        await self._simulate_io()
+        before_len = len(self._follows)
+        self._follows = [
+            f for f in self._follows
+            if not (f["followerId"] == requester_id and f["followingId"] == target_id and f.get("status") == "pending")
+        ]
+        return len(self._follows) < before_len
+
+    async def list_followers(
+        self,
+        user_id: str,
+        viewer_id: Optional[str] = None,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        await self._simulate_io()
+        active_follows = [
+            f for f in self._follows
+            if f["followingId"] == user_id and f.get("status", "accepted") == "accepted"
+        ]
+        users = []
+        for f in active_follows:
+            u = self._find_user(f["followerId"])
+            if u:
+                followed_by_viewer = self._is_following(viewer_id, u["id"]) if viewer_id else False
+                users.append({
+                    "id": u["id"],
+                    "handle": u["handle"],
+                    "displayName": u["displayName"],
+                    "avatar": u.get("avatar"),
+                    "followedByViewer": followed_by_viewer,
+                    "createdAt": f.get("createdAt"),
+                })
+        return users[:limit + 1]
+
+    async def list_following(
+        self,
+        user_id: str,
+        viewer_id: Optional[str] = None,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        await self._simulate_io()
+        active_follows = [
+            f for f in self._follows
+            if f["followerId"] == user_id and f.get("status", "accepted") == "accepted"
+        ]
+        users = []
+        for f in active_follows:
+            u = self._find_user(f["followingId"])
+            if u:
+                followed_by_viewer = self._is_following(viewer_id, u["id"]) if viewer_id else False
+                users.append({
+                    "id": u["id"],
+                    "handle": u["handle"],
+                    "displayName": u["displayName"],
+                    "avatar": u.get("avatar"),
+                    "followedByViewer": followed_by_viewer,
+                    "createdAt": f.get("createdAt"),
+                })
+        return users[:limit + 1]
 
     async def is_following(
         self,

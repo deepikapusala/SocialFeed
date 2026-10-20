@@ -37,8 +37,9 @@ def get_async_engine() -> AsyncEngine:
             echo=False,
             future=True,
             connect_args=connect_args,
-            pool_size=30,
-            max_overflow=20,
+            pool_size=40,
+            max_overflow=30,
+            pool_timeout=30.0,
         )
     return _async_engine
 

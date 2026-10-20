@@ -13,7 +13,7 @@ from app.repositories.base import SocialRepositoryProtocol
 from app.schemas.common import PaginatedResponse
 from app.schemas.media import MediaItem
 from app.schemas.post import PostItem, PostDetailResponse, FeedResponse, LikeResponse, RepostResponse
-from app.schemas.user import ProfileUpdateRequest, UserProfile, UserProfileResponse
+from app.schemas.user import ProfileUpdateRequest, UserProfile, UserProfileResponse, RelationshipUserItem
 
 
 class SocialService:
@@ -76,7 +76,7 @@ class SocialService:
         req: ProfileUpdateRequest,
     ) -> UserProfileResponse:
         """
-        Updates allowed profile fields (display_name, bio, avatars).
+        Updates allowed profile fields (display_name, bio, avatars, is_private).
         Enforces strict authorization: only the account owner may update.
         """
         clean_actor_id = self._validate_uuid(actor_id, "actor_id")
@@ -97,6 +97,8 @@ class SocialService:
             fields["avatar_small_url"] = req.avatar_small_url
         if req.avatar_large_url is not None:
             fields["avatar_large_url"] = req.avatar_large_url
+        if req.is_private is not None:
+            fields["is_private"] = req.is_private
 
         raw_user = await self._repository.update_user_profile(clean_target_id, fields)
         if not raw_user:
@@ -131,24 +133,183 @@ class SocialService:
         Follows target user for the current viewer actor.
         """
         clean_target_id = self._validate_uuid(target_user_id, "id")
-        is_following, follower_count = await self._repository.follow_user(follower_id, clean_target_id)
+        clean_follower_id = self._validate_uuid(follower_id, "actor_id")
+        if clean_follower_id == clean_target_id:
+            raise ValidationError("Self-follow is prohibited.", details=[{"reason": "self_follow_prohibited"}], status_code=400)
+
+        rel_status, is_following, follower_count = await self._repository.follow_user(clean_follower_id, clean_target_id)
         return {
             "user_id": clean_target_id,
             "followed_by_viewer": is_following,
             "follower_count": follower_count,
+            "relationship_status": rel_status,
         }
 
     async def unfollow_user(self, follower_id: str, target_user_id: str) -> Dict[str, Any]:
         """
-        Unfollows target user for the current viewer actor.
+        Unfollows target user or cancels pending follow request.
         """
         clean_target_id = self._validate_uuid(target_user_id, "id")
-        is_following, follower_count = await self._repository.unfollow_user(follower_id, clean_target_id)
+        clean_follower_id = self._validate_uuid(follower_id, "actor_id")
+        rel_status, is_following, follower_count = await self._repository.unfollow_user(clean_follower_id, clean_target_id)
         return {
             "user_id": clean_target_id,
             "followed_by_viewer": is_following,
             "follower_count": follower_count,
+            "relationship_status": rel_status,
         }
+
+    async def accept_follow_request(self, actor_id: str, requester_id: str) -> Dict[str, Any]:
+        """
+        Target user accepts a pending follow request from requester.
+        """
+        clean_actor_id = self._validate_uuid(actor_id, "actor_id")
+        clean_requester_id = self._validate_uuid(requester_id, "requester_id")
+
+        is_accepted, follower_count = await self._repository.accept_follow_request(
+            target_id=clean_actor_id,
+            requester_id=clean_requester_id,
+        )
+        if not is_accepted:
+            raise NotFoundError(
+                "Pending follow request not found.",
+                details=[{"field": "requesterId", "reason": "not_found"}],
+            )
+
+        return {
+            "requester_id": clean_requester_id,
+            "accepted": True,
+            "follower_count": follower_count,
+        }
+
+    async def reject_follow_request(self, actor_id: str, requester_id: str) -> None:
+        """
+        Target user rejects a pending follow request from requester.
+        """
+        clean_actor_id = self._validate_uuid(actor_id, "actor_id")
+        clean_requester_id = self._validate_uuid(requester_id, "requester_id")
+
+        is_rejected = await self._repository.reject_follow_request(
+            target_id=clean_actor_id,
+            requester_id=clean_requester_id,
+        )
+        if not is_rejected:
+            raise NotFoundError(
+                "Pending follow request not found.",
+                details=[{"field": "requesterId", "reason": "not_found"}],
+            )
+
+    async def _check_profile_visibility(self, target_user_id: str, viewer_id: Optional[str]) -> None:
+        """
+        Verifies if viewer is authorized to view a potentially private profile's protected data
+        (followers, following, media).
+        """
+        profile = await self._repository.get_user_profile(target_user_id, viewer_id=viewer_id)
+        if not profile:
+            raise NotFoundError(f"User with id '{target_user_id}' not found.")
+
+        if profile.get("isPrivate"):
+            # If viewer is the user themselves, allow
+            if viewer_id and str(viewer_id) == str(target_user_id):
+                return
+            # If viewer is an accepted follower, allow
+            if profile.get("followedByViewer"):
+                return
+            # Otherwise forbidden
+            raise ForbiddenError(
+                "This account is private. Follow this user to see their content.",
+                details=[{"field": "id", "reason": "private_account"}],
+            )
+
+    async def list_followers(
+        self,
+        user_id: str,
+        viewer_id: Optional[str],
+        cursor_str: Optional[str],
+        limit: int,
+    ) -> PaginatedResponse[RelationshipUserItem]:
+        """
+        Returns bounded, cursor-paginated active followers of user_id.
+        Enforces privacy visibility.
+        """
+        clean_user_id = self._validate_uuid(user_id, "id")
+        clean_limit = self._validate_limit(limit)
+        await self._check_profile_visibility(clean_user_id, viewer_id)
+
+        cursor_tuple = None
+        if cursor_str:
+            try:
+                cursor_tuple = decode_cursor(cursor_str)
+            except InvalidCursorError as e:
+                raise ValidationError(f"Invalid cursor: {e}", details=[{"field": "cursor", "reason": "invalid_cursor"}])
+
+        raw_followers = await self._repository.list_followers(
+            user_id=clean_user_id,
+            viewer_id=viewer_id,
+            cursor_tuple=cursor_tuple,
+            limit=clean_limit,
+        )
+
+        if len(raw_followers) > clean_limit:
+            page_records = raw_followers[:clean_limit]
+            has_more = True
+            last_record = page_records[-1]
+            next_cursor = encode_cursor(last_record["createdAt"], last_record["id"])
+        else:
+            page_records = raw_followers
+            has_more = False
+            next_cursor = None
+
+        return PaginatedResponse[RelationshipUserItem](
+            items=[RelationshipUserItem(**r) for r in page_records],
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
+
+    async def list_following(
+        self,
+        user_id: str,
+        viewer_id: Optional[str],
+        cursor_str: Optional[str],
+        limit: int,
+    ) -> PaginatedResponse[RelationshipUserItem]:
+        """
+        Returns bounded, cursor-paginated active followees of user_id.
+        Enforces privacy visibility.
+        """
+        clean_user_id = self._validate_uuid(user_id, "id")
+        clean_limit = self._validate_limit(limit)
+        await self._check_profile_visibility(clean_user_id, viewer_id)
+
+        cursor_tuple = None
+        if cursor_str:
+            try:
+                cursor_tuple = decode_cursor(cursor_str)
+            except InvalidCursorError as e:
+                raise ValidationError(f"Invalid cursor: {e}", details=[{"field": "cursor", "reason": "invalid_cursor"}])
+
+        raw_following = await self._repository.list_following(
+            user_id=clean_user_id,
+            viewer_id=viewer_id,
+            cursor_tuple=cursor_tuple,
+            limit=clean_limit,
+        )
+
+        if len(raw_following) > clean_limit:
+            page_records = raw_following[:clean_limit]
+            has_more = True
+            last_record = page_records[-1]
+            next_cursor = encode_cursor(last_record["createdAt"], last_record["id"])
+        else:
+            page_records = raw_following
+            has_more = False
+            next_cursor = None
+
+        return PaginatedResponse[RelationshipUserItem](
+            items=[RelationshipUserItem(**r) for r in page_records],
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
 
     async def list_direct_replies(
         self,
@@ -208,9 +369,11 @@ class SocialService:
         user_id: str,
         cursor_str: Optional[str],
         limit: int,
+        viewer_id: Optional[str] = None,
     ) -> PaginatedResponse[MediaItem]:
         """
         Retrieves paginated media rows from a user's original posts.
+        Enforces privacy visibility.
         """
         clean_user_id = self._validate_uuid(user_id, "id")
         clean_limit = self._validate_limit(limit)
@@ -218,6 +381,8 @@ class SocialService:
         exists = await self._repository.user_exists(clean_user_id)
         if not exists:
             raise NotFoundError(f"User with id '{clean_user_id}' not found.")
+
+        await self._check_profile_visibility(clean_user_id, viewer_id)
 
         cursor_tuple = None
         if cursor_str:

@@ -15,8 +15,10 @@ from app.repositories.base import SocialRepositoryProtocol
 from app.schemas.common import PaginatedResponse
 from app.schemas.media import MediaItem
 from app.schemas.user import (
+    FollowRequestAcceptResponse,
     FollowResponse,
     ProfileUpdateRequest,
+    RelationshipUserItem,
     UserProfileResponse,
 )
 from app.services.social_service import SocialService
@@ -65,11 +67,85 @@ async def unfollow_user(
     return FollowResponse(**result)
 
 
+@router.post("/users/requests/{requester_id}/accept", response_model=FollowRequestAcceptResponse)
+@router.post("/requests/{requester_id}/accept", response_model=FollowRequestAcceptResponse)
+async def accept_follow_request(
+    requester_id: str,
+    actor_id: str = Depends(get_current_actor_id),
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+) -> FollowRequestAcceptResponse:
+    """
+    Accepts a pending follow request from requester_id.
+    Caller is the target receiving the request.
+    """
+    service = SocialService(repo)
+    res = await service.accept_follow_request(actor_id=actor_id, requester_id=requester_id)
+    return FollowRequestAcceptResponse(**res)
+
+
+@router.post("/users/requests/{requester_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/requests/{requester_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
+async def reject_follow_request(
+    requester_id: str,
+    actor_id: str = Depends(get_current_actor_id),
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+) -> None:
+    """
+    Rejects a pending follow request from requester_id.
+    Caller is the target receiving the request.
+    """
+    service = SocialService(repo)
+    await service.reject_follow_request(actor_id=actor_id, requester_id=requester_id)
+
+
+@router.get("/users/{id}/followers", response_model=PaginatedResponse[RelationshipUserItem])
+async def list_followers(
+    id: str,
+    cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
+    limit: int = Query(10, description="Page size (1-50)"),
+    viewer_id: str = Depends(get_current_actor_id),
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+) -> PaginatedResponse[RelationshipUserItem]:
+    """
+    Returns bounded, cursor-paginated active followers of user_id.
+    Enforces privacy visibility.
+    """
+    service = SocialService(repo)
+    return await service.list_followers(
+        user_id=id,
+        viewer_id=viewer_id,
+        cursor_str=cursor,
+        limit=limit,
+    )
+
+
+@router.get("/users/{id}/following", response_model=PaginatedResponse[RelationshipUserItem])
+async def list_following(
+    id: str,
+    cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
+    limit: int = Query(10, description="Page size (1-50)"),
+    viewer_id: str = Depends(get_current_actor_id),
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+) -> PaginatedResponse[RelationshipUserItem]:
+    """
+    Returns bounded, cursor-paginated active followees of user_id.
+    Enforces privacy visibility.
+    """
+    service = SocialService(repo)
+    return await service.list_following(
+        user_id=id,
+        viewer_id=viewer_id,
+        cursor_str=cursor,
+        limit=limit,
+    )
+
+
 @router.get("/users/{id}/media", response_model=PaginatedResponse[MediaItem])
 async def list_profile_media(
     id: str,
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
     limit: int = Query(10, description="Page size (1-50)"),
+    viewer_id: str = Depends(get_current_actor_id),
     repo: SocialRepositoryProtocol = Depends(get_repository),
 ) -> PaginatedResponse[MediaItem]:
     """
@@ -80,6 +156,7 @@ async def list_profile_media(
         user_id=id,
         cursor_str=cursor,
         limit=limit,
+        viewer_id=viewer_id,
     )
 
 
