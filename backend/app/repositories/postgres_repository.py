@@ -23,7 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
-from app.common.errors import ConflictError, NotFoundError, ValidationError
+from app.common.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.models import Follow, Post, PostLike, PostMedia, Session, User
 
 
@@ -111,6 +111,8 @@ class PostgresRepository:
             "repostedByViewer": reposted_by_viewer,
             "replyToId": str(post.reply_to_id) if post.reply_to_id else None,
             "repostOfId": str(post.repost_of_id) if post.repost_of_id else None,
+            "updatedAt": post.updated_at.isoformat().replace("+00:00", "Z") if getattr(post, "updated_at", None) else None,
+            "version": getattr(post, "version", 1),
         }
 
         if post.kind == "repost" and referenced_author_handle is not None:
@@ -239,6 +241,7 @@ class PostgresRepository:
             .where(
                 and_(
                     Post.kind == "original",
+                    Post.deleted_at.is_(None),
                     User.is_active.is_(True),
                 )
             )
@@ -363,7 +366,7 @@ class PostgresRepository:
                 selectinload(Post.author),
                 selectinload(Post.media),
             )
-            .where(Post.id == post_uuid)
+            .where(and_(Post.id == post_uuid, Post.deleted_at.is_(None)))
         )
 
         result = await self._session.execute(stmt)
@@ -420,7 +423,13 @@ class PostgresRepository:
         # Scalar subqueries for profile counts
         post_count_sq = (
             select(func.count(Post.id))
-            .where(and_(Post.author_id == user_uuid, Post.kind == "original"))
+            .where(
+                and_(
+                    Post.author_id == user_uuid,
+                    Post.kind == "original",
+                    Post.deleted_at.is_(None),
+                )
+            )
             .scalar_subquery()
         )
         follower_count_sq = (
@@ -534,7 +543,13 @@ class PostgresRepository:
                 liked_by_viewer_sq.label("liked_by_viewer"),
             )
             .options(selectinload(Post.author))
-            .where(and_(Post.kind == "reply", Post.reply_to_id == parent_uuid))
+            .where(
+                and_(
+                    Post.kind == "reply",
+                    Post.reply_to_id == parent_uuid,
+                    Post.deleted_at.is_(None),
+                )
+            )
             .order_by(Post.created_at.desc(), Post.id.desc())
             .limit(limit + 1)
         )
@@ -564,7 +579,13 @@ class PostgresRepository:
         stmt = (
             select(PostMedia)
             .join(Post, Post.id == PostMedia.post_id)
-            .where(and_(Post.author_id == user_uuid, Post.kind == "original"))
+            .where(
+                and_(
+                    Post.author_id == user_uuid,
+                    Post.kind == "original",
+                    Post.deleted_at.is_(None),
+                )
+            )
             .order_by(PostMedia.created_at.desc(), PostMedia.id.desc())
             .limit(limit + 1)
         )
@@ -638,6 +659,7 @@ class PostgresRepository:
             .where(
                 and_(
                     Post.kind == "original",
+                    Post.deleted_at.is_(None),
                     Post.text.ilike(f"%{clean_query}%"),
                 )
             )
@@ -668,12 +690,14 @@ class PostgresRepository:
         result = await self._session.execute(stmt)
         return bool(result.scalar())
 
-    async def get_post_kind(self, post_id: str) -> Optional[str]:
+    async def get_post_kind(self, post_id: str, include_deleted: bool = False) -> Optional[str]:
         try:
             post_uuid = uuid.UUID(post_id)
         except ValueError:
             return None
         stmt = select(Post.kind).where(Post.id == post_uuid)
+        if not include_deleted:
+            stmt = stmt.where(Post.deleted_at.is_(None))
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -1324,4 +1348,103 @@ class PostgresRepository:
         await self._session.execute(stmt)
         await self._session.commit()
         return True
+
+    async def update_post(
+        self,
+        post_id: str,
+        author_id: str,
+        text: str,
+        expected_version: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Updates an existing original or reply post's text.
+        Enforces:
+        - Post existence and not deleted (404)
+        - Author ownership (403 if not owner)
+        - Kind is original or reply (422 if repost)
+        - Valid text length (1 to 280 chars) (422)
+        - Optimistic concurrency control (409 if version mismatch)
+        Returns updated post detail.
+        """
+        post_uuid = uuid.UUID(post_id)
+        author_uuid = uuid.UUID(author_id)
+        clean_text = text.strip()
+        if not (1 <= len(clean_text) <= 280):
+            raise ValidationError(
+                "Post text must be between 1 and 280 characters",
+                details=[{"field": "text", "reason": "length"}],
+                status_code=422,
+            )
+
+        post = await self._session.get(Post, post_uuid)
+        if not post or post.deleted_at is not None:
+            raise NotFoundError(
+                "Post not found",
+                details=[{"field": "postId", "reason": "not_found"}],
+            )
+
+        if post.author_id != author_uuid:
+            raise ForbiddenError(
+                "You are not authorized to edit another author's post",
+                details=[{"field": "authorId", "reason": "forbidden_cross_user_mutation"}],
+            )
+
+        if post.kind not in ("original", "reply"):
+            raise ValidationError(
+                "Only original and reply posts can be edited",
+                details=[{"field": "kind", "reason": "invalid_kind"}],
+                status_code=422,
+            )
+
+        if expected_version is not None and post.version != expected_version:
+            raise ConflictError(
+                f"Post was modified by another request. Current version is {post.version}, expected {expected_version}",
+                details=[{"field": "version", "reason": "stale_version_conflict"}],
+            )
+
+        post.text = clean_text
+        post.version = post.version + 1
+        post.updated_at = datetime.now()
+
+        await self._session.commit()
+        return await self.get_post_detail(post_id=post_id, viewer_id=author_id)  # type: ignore
+
+    async def delete_post(
+        self,
+        post_id: str,
+        author_id: str,
+    ) -> bool:
+        """
+        Soft-deletes a post owned by author_id.
+        Sets deleted_at = CURRENT_TIMESTAMP.
+        Idempotent:
+        - If post does not exist -> 404
+        - If post author != author_id -> 403
+        - If post already deleted -> returns True (204 No Content)
+        - If post active -> sets deleted_at, commits, returns True
+        """
+        post_uuid = uuid.UUID(post_id)
+        author_uuid = uuid.UUID(author_id)
+
+        post = await self._session.get(Post, post_uuid)
+        if not post:
+            raise NotFoundError(
+                "Post not found",
+                details=[{"field": "postId", "reason": "not_found"}],
+            )
+
+        if post.author_id != author_uuid:
+            raise ForbiddenError(
+                "You are not authorized to delete another author's post",
+                details=[{"field": "authorId", "reason": "forbidden_cross_user_mutation"}],
+            )
+
+        if post.deleted_at is not None:
+            # Idempotent: already deleted by owner
+            return True
+
+        post.deleted_at = datetime.now()
+        await self._session.commit()
+        return True
+
 

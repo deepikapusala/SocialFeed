@@ -65,6 +65,18 @@ class Post(Base):
         server_default=func.current_timestamp(),
         nullable=False,
     )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    version: Mapped[int] = mapped_column(
+        nullable=False,
+        default=1,
+    )
 
     __table_args__ = (
         UniqueConstraint("author_id", "repost_of_id", name="posts_author_repost_unique"),

@@ -30,6 +30,8 @@ class PostItem(CamelModel):
     reposted_by_viewer: bool = False
     reply_to_id: Optional[str] = None
     repost_of_id: Optional[str] = None
+    updated_at: Optional[datetime] = None
+    version: Optional[int] = 1
 
 
 class PostDetailResponse(CamelModel):
@@ -65,6 +67,17 @@ class CreatePostRequest(CamelModel):
     media: Optional[List[Dict[str, Any]]] = None
 
 
+class UpdatePostRequest(CamelModel):
+    """
+    Request body for PATCH /posts/{id}.
+    Strictly forbids immutable fields (kind, authorId, id, counts, etc.).
+    """
+    model_config = {"extra": "forbid"}
+
+    text: str = Field(..., min_length=1, max_length=280)
+    version: Optional[int] = Field(default=None, description="Expected post version for optimistic concurrency")
+
+
 class LikeResponse(CamelModel):
     """
     Response body for PUT /posts/{id}/like and DELETE /posts/{id}/like.
@@ -81,4 +94,5 @@ class RepostResponse(CamelModel):
     post_id: str
     reposted_by_viewer: bool
     repost_count: int
+
 

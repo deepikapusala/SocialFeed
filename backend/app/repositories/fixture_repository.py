@@ -438,10 +438,12 @@ class FixtureRepository:
         await self._simulate_io()
         return any(u["id"] == user_id for u in self._users)
 
-    async def get_post_kind(self, post_id: str) -> Optional[str]:
+    async def get_post_kind(self, post_id: str, include_deleted: bool = False) -> Optional[str]:
         await self._simulate_io()
         for p in self._all_posts:
             if p["id"] == post_id:
+                if not include_deleted and p.get("deletedAt") is not None:
+                    return None
                 return p["kind"]
         return None
 
@@ -509,3 +511,41 @@ class FixtureRepository:
             return False
         user["isActive"] = False
         return True
+
+    async def update_post(
+        self,
+        post_id: str,
+        author_id: str,
+        text: str,
+        expected_version: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        await self._simulate_io()
+        post = next((p for p in self._all_posts if p["id"] == post_id), None)
+        if not post or post.get("deletedAt") is not None:
+            raise NotFoundError("Post not found")
+        if post.get("authorId") != author_id:
+            raise ForbiddenError("Forbidden cross user mutation")
+        if post.get("kind") not in ("original", "reply"):
+            raise ValidationError("Invalid kind", status_code=422)
+        current_version = post.get("version", 1)
+        if expected_version is not None and current_version != expected_version:
+            raise ConflictError("Stale version conflict")
+        post["text"] = text.strip()
+        post["version"] = current_version + 1
+        post["updatedAt"] = datetime.now().isoformat() + "Z"
+        return await self.get_post_detail(post_id, viewer_id=author_id)  # type: ignore
+
+    async def delete_post(
+        self,
+        post_id: str,
+        author_id: str,
+    ) -> bool:
+        await self._simulate_io()
+        post = next((p for p in self._all_posts if p["id"] == post_id), None)
+        if not post:
+            raise NotFoundError("Post not found")
+        if post.get("authorId") != author_id:
+            raise ForbiddenError("Forbidden cross user mutation")
+        post["deletedAt"] = datetime.now().isoformat() + "Z"
+        return True
+

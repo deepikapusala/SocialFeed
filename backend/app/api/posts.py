@@ -124,3 +124,51 @@ async def remove_post_repost(
     """
     service = SocialService(repo)
     return await service.remove_repost(user_id=actor_id, post_id=id)
+
+
+from fastapi import Header
+from app.schemas.post import UpdatePostRequest
+
+
+@router.patch("/posts/{id}", response_model=PostDetailResponse)
+async def update_post(
+    id: str,
+    request: UpdatePostRequest,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+    actor_id: str = Depends(get_current_actor_id),
+) -> PostDetailResponse:
+    """
+    Updates post text with optimistic concurrency control.
+    Supports version from request body or If-Match header (e.g. If-Match: "1" or 1).
+    """
+    expected_version = request.version
+    if expected_version is None and if_match:
+        try:
+            clean_match = if_match.strip().strip('"').strip("'")
+            expected_version = int(clean_match)
+        except ValueError:
+            pass
+
+    service = SocialService(repo)
+    return await service.update_post(
+        post_id=id,
+        author_id=actor_id,
+        text=request.text,
+        expected_version=expected_version,
+    )
+
+
+@router.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post(
+    id: str,
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+    actor_id: str = Depends(get_current_actor_id),
+) -> None:
+    """
+    Soft-deletes a post authored by the current actor.
+    Idempotent: returns 204 No Content.
+    """
+    service = SocialService(repo)
+    await service.delete_post(post_id=id, author_id=actor_id)
+

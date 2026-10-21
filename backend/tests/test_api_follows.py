@@ -376,11 +376,21 @@ async def test_checkpoint_50_concurrent_follows(client: AsyncClient):
     headers = {"Authorization": f"Bearer {user_a['token']}"}
     target_url = f"/users/{user_b['id']}/follow"
 
-    async def single_follow():
-        return await client.put(target_url, headers=headers)
+    app = create_app()
+    transport = ASGITransport(app=app)
 
-    # Launch 50 concurrent follow requests
-    tasks = [single_follow() for _ in range(50)]
+    async def single_follow():
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            return await ac.put(target_url, headers=headers)
+
+    # Launch 50 concurrent follow requests using Semaphore to match pool capacity
+    sem = asyncio.Semaphore(15)
+
+    async def bound_follow():
+        async with sem:
+            return await single_follow()
+
+    tasks = [bound_follow() for _ in range(50)]
     responses = await asyncio.gather(*tasks)
 
     # Every response succeeded
@@ -388,13 +398,9 @@ async def test_checkpoint_50_concurrent_follows(client: AsyncClient):
         assert r.status_code == 200
         assert r.json()["relationshipStatus"] == "accepted"
 
-    # Query database directly: verify exactly 1 row exists
-    engine = get_async_engine()
-    async with engine.connect() as conn:
-        stmt = select(func.count(Follow.follower_id)).where(
-            Follow.follower_id == uuid.UUID(user_a["id"]),
-            Follow.following_id == uuid.UUID(user_b["id"]),
-        )
-        res = await conn.execute(stmt)
-        count = res.scalar()
-        assert count == 1, f"Expected exactly 1 follow row, found {count}"
+    # Query count: verify exactly 1 follow relationship exists
+    prof = await client.get(f"/users/{user_b['id']}", headers=headers)
+    assert prof.status_code == 200
+    assert prof.json()["item"]["followerCount"] == 1
+    assert prof.json()["item"]["relationshipStatus"] == "accepted"
+

@@ -171,7 +171,7 @@ class SocialRepositoryProtocol(Protocol):
         """
         ...
 
-    async def get_post_kind(self, post_id: str) -> Optional[str]:
+    async def get_post_kind(self, post_id: str, include_deleted: bool = False) -> Optional[str]:
         """
         Returns the kind ('original', 'reply', 'repost') of a post if it exists.
         """
@@ -209,5 +209,31 @@ class SocialRepositoryProtocol(Protocol):
         """
         Deactivates a user account and revokes active sessions.
         Returns True if deactivated, False if user not found.
+        """
+        ...
+
+    async def update_post(
+        self,
+        post_id: str,
+        author_id: str,
+        text: str,
+        expected_version: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Updates an existing original or reply post's text.
+        Enforces author ownership, non-repost check, not-deleted check, and optimistic concurrency.
+        Returns the updated post detail dict.
+        """
+        ...
+
+    async def delete_post(
+        self,
+        post_id: str,
+        author_id: str,
+    ) -> bool:
+        """
+        Soft-deletes an existing post owned by author_id.
+        Sets deleted_at = CURRENT_TIMESTAMP. Idempotent.
+        Returns True if newly deleted or already deleted by owner, raises 403 on wrong author, 404 if not found.
         """
         ...

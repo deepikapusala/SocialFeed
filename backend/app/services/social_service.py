@@ -324,8 +324,8 @@ class SocialService:
         clean_post_id = self._validate_uuid(post_id, "id")
         clean_limit = self._validate_limit(limit)
 
-        # Confirm post exists and is an original
-        kind = await self._repository.get_post_kind(clean_post_id)
+        # Confirm post exists and is an original (allow replies on tombstoned/deleted parents)
+        kind = await self._repository.get_post_kind(clean_post_id, include_deleted=True)
         if kind is None:
             raise NotFoundError(f"Post with id '{clean_post_id}' not found.")
         if kind != "original":
@@ -528,3 +528,47 @@ class SocialService:
             res = await self._repository.remove_repost(user_id=user_id, post_id=clean_post_id)
             return RepostResponse(**res)
         raise ValidationError("Repository does not support repost removal", status_code=500)
+
+    async def update_post(
+        self,
+        post_id: str,
+        author_id: str,
+        text: str,
+        expected_version: Optional[int] = None,
+    ) -> PostDetailResponse:
+        """
+        Edits an eligible post's text.
+        """
+        clean_post_id = self._validate_uuid(post_id, "id")
+        clean_author_id = self._validate_uuid(author_id, "author_id")
+
+        if not hasattr(self._repository, "update_post"):
+            raise ValidationError("Repository does not support post updates", status_code=500)
+
+        raw_post = await self._repository.update_post(
+            post_id=clean_post_id,
+            author_id=clean_author_id,
+            text=text,
+            expected_version=expected_version,
+        )
+        return PostDetailResponse(item=PostItem(**raw_post))
+
+    async def delete_post(
+        self,
+        post_id: str,
+        author_id: str,
+    ) -> None:
+        """
+        Soft-deletes an eligible post owned by author_id.
+        """
+        clean_post_id = self._validate_uuid(post_id, "id")
+        clean_author_id = self._validate_uuid(author_id, "author_id")
+
+        if not hasattr(self._repository, "delete_post"):
+            raise ValidationError("Repository does not support post deletion", status_code=500)
+
+        await self._repository.delete_post(
+            post_id=clean_post_id,
+            author_id=clean_author_id,
+        )
+

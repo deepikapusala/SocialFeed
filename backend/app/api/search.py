@@ -13,6 +13,7 @@ router = APIRouter(tags=["search"])
 
  
 @router.get("/search/posts", response_model=FeedResponse)
+@router.get("/search/originals", response_model=FeedResponse)
 @router.get("/search", response_model=FeedResponse)
 async def search_posts(
     q: str = Query(..., min_length=2, max_length=80, description="Literal substring query"),
