@@ -151,25 +151,36 @@ class FixtureRepository:
         cursor_tuple: Optional[Tuple[datetime, str]],
         limit: int,
         viewer_id: str,
+        scope: str = "public",
     ) -> List[Dict[str, Any]]:
         await self._simulate_io()
 
         # 1. Filter only original posts
         originals = list(self._originals)
 
-        # 2. Sort descending by (createdAt DESC, id DESC)
+        # 2. Scope filtering
+        if scope == "home":
+            followed_ids = {
+                f["followingId"]
+                for f in self._follows
+                if f["followerId"] == viewer_id and f.get("status", "accepted") == "accepted"
+            }
+            eligible_authors = followed_ids | {viewer_id}
+            originals = [p for p in originals if p["authorId"] in eligible_authors]
+
+        # 3. Sort descending by (createdAt DESC, id DESC)
         originals.sort(key=lambda p: (p["createdAt"], p["id"]), reverse=True)
 
-        # 3. Apply tuple predicate strictly
+        # 4. Apply tuple predicate strictly
         filtered = [
             p for p in originals
             if self._is_strictly_before(p["createdAt"], p["id"], cursor_tuple)
         ]
 
-        # 4. Fetch at most limit + 1 items
+        # 5. Fetch at most limit + 1 items
         batch = filtered[: limit + 1]
 
-        # 5. Assemble full post contracts
+        # 6. Assemble full post contracts
         return [self._assemble_post(p, viewer_id) for p in batch]
 
     async def get_post_detail(

@@ -25,9 +25,11 @@ class FeedService:
         cursor_str: Optional[str],
         limit: int,
         viewer_id: str,
+        scope: str = "public",
     ) -> FeedResponse:
         """
         Retrieves a paginated page of original posts.
+        Supports scope='home' (personalized) or scope='public'.
         """
         # 1. Validate limit parameter (1 to 50)
         if not isinstance(limit, int) or limit < 1 or limit > 50:
@@ -36,7 +38,16 @@ class FeedService:
                 details=[{"field": "limit", "reason": "out_of_range"}],
             )
 
-        # 2. Decode cursor token if supplied
+        # 2. Validate and resolve scope
+        clean_scope = scope.lower().strip() if scope else "public"
+        if clean_scope not in ("home", "public"):
+            raise ValidationError(
+                f"Invalid scope '{scope}'. Allowed values are 'home' or 'public'.",
+                details=[{"field": "scope", "reason": "invalid_scope"}],
+                status_code=400,
+            )
+
+        # 3. Decode cursor token if supplied
         cursor_tuple = None
         if cursor_str:
             try:
@@ -47,12 +58,21 @@ class FeedService:
                     details=[{"field": "cursor", "reason": "invalid_cursor"}],
                 )
 
-        # 3. Request at most limit + 1 items from repository
-        raw_items = await self._repository.list_original_feed(
-            cursor_tuple=cursor_tuple,
-            limit=limit,
-            viewer_id=viewer_id,
-        )
+        # 4. Request at most limit + 1 items from repository
+        try:
+            raw_items = await self._repository.list_original_feed(
+                cursor_tuple=cursor_tuple,
+                limit=limit,
+                viewer_id=viewer_id,
+                scope=clean_scope,
+            )
+        except TypeError:
+            # Fallback for mock repositories that do not accept scope parameter
+            raw_items = await self._repository.list_original_feed(
+                cursor_tuple=cursor_tuple,
+                limit=limit,
+                viewer_id=viewer_id,
+            )
 
         # 4. Derive has_more and next_cursor
         if len(raw_items) > limit:

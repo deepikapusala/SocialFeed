@@ -20,10 +20,12 @@ class SocialRepositoryProtocol(Protocol):
         cursor_tuple: Optional[Tuple[datetime, str]],
         limit: int,
         viewer_id: str,
+        scope: str = "home",
     ) -> List[Dict[str, Any]]:
         """
         Fetches at most limit + 1 original posts ordered by (createdAt DESC, id DESC)
         where (createdAt, id) < cursor_tuple.
+        Supports scope='home' (personalized) or scope='public'.
         """
         ...
 

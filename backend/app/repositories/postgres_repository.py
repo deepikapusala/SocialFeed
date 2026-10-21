@@ -150,6 +150,7 @@ class PostgresRepository:
         cursor_tuple: Optional[Tuple[datetime, str]],
         limit: int,
         viewer_id: str,
+        scope: str = "home",
     ) -> List[Dict[str, Any]]:
         viewer_uuid = uuid.UUID(viewer_id)
 
@@ -189,6 +190,7 @@ class PostgresRepository:
                         and_(
                             Follow.follower_id == viewer_uuid,
                             Follow.following_id == Post.author_id,
+                            Follow.status == "accepted",
                         )
                     )
                     .correlate(Post)
@@ -234,8 +236,31 @@ class PostgresRepository:
                 selectinload(Post.author),
                 selectinload(Post.media),
             )
-            .where(Post.kind == "original")
-            .order_by(Post.created_at.desc(), Post.id.desc())
+            .where(
+                and_(
+                    Post.kind == "original",
+                    User.is_active.is_(True),
+                )
+            )
+        )
+
+        if scope == "home":
+            # Personalized feed: only viewer's own posts and accepted followed authors
+            eligible_authors = or_(
+                Post.author_id == viewer_uuid,
+                Post.author_id.in_(
+                    select(Follow.following_id).where(
+                        and_(
+                            Follow.follower_id == viewer_uuid,
+                            Follow.status == "accepted",
+                        )
+                    )
+                ),
+            )
+            stmt = stmt.where(eligible_authors)
+
+        stmt = (
+            stmt.order_by(Post.created_at.desc(), Post.id.desc())
             .limit(limit + 1)
         )
 

@@ -13,7 +13,7 @@ from app.services.feed_service import FeedService
 
 router = APIRouter(tags=["feed"])
 
-ALLOWED_FEED_PARAMS = {"cursor", "limit"}
+ALLOWED_FEED_PARAMS = {"cursor", "limit", "scope"}
 
 
 @router.get("/feed", response_model=FeedResponse)
@@ -21,11 +21,13 @@ async def get_feed(
     request: Request,
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
     limit: int = Query(10, description="Page size (1-50)"),
+    scope: Optional[str] = Query(None, description="Feed scope: 'home' (personalized) or 'public'"),
     repo: SocialRepositoryProtocol = Depends(get_repository),
     viewer_id: str = Depends(get_current_actor_id),
 ) -> FeedResponse:
     """
     Retrieve paginated original-post chronological feed.
+    Defaults to personalized 'home' feed for authenticated actors, or 'public' for unauthenticated/demo.
     """
     raw_query = request.scope.get("query_string", b"").decode("latin-1")
     if raw_query:
@@ -52,9 +54,17 @@ async def get_feed(
                 )
             seen_keys.add(key)
 
+    # Default to "home" for authenticated actors, "public" for unauthenticated/demo
+    if scope is None:
+        auth_header = request.headers.get("Authorization")
+        resolved_scope = "home" if auth_header else "public"
+    else:
+        resolved_scope = scope.lower().strip()
+
     service = FeedService(repo)
     return await service.get_feed(
         cursor_str=cursor,
         limit=limit,
         viewer_id=viewer_id,
+        scope=resolved_scope,
     )
