@@ -12,7 +12,7 @@ from app.models import Base, User, Post, PostMedia, PostLike, Follow
 def test_metadata_contains_all_tables():
     """Verify that required domain tables and sessions are registered in Base.metadata."""
     table_names = set(Base.metadata.tables.keys())
-    expected_tables = {"users", "posts", "post_media", "post_likes", "follows", "sessions"}
+    expected_tables = {"users", "posts", "post_media", "post_likes", "follows", "sessions", "notifications"}
     assert table_names == expected_tables, f"Metadata tables mismatch. Got: {table_names}"
 
 

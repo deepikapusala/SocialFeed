@@ -549,3 +549,28 @@ class FixtureRepository:
         post["deletedAt"] = datetime.now().isoformat() + "Z"
         return True
 
+    async def list_notifications(
+        self,
+        recipient_id: str,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        await self._simulate_io()
+        return []
+
+    async def get_unread_notification_count(
+        self,
+        recipient_id: str,
+    ) -> int:
+        await self._simulate_io()
+        return 0
+
+    async def mark_notifications_read(
+        self,
+        recipient_id: str,
+        notification_id: Optional[str] = None,
+    ) -> Tuple[int, int]:
+        await self._simulate_io()
+        return 0, 0
+
+

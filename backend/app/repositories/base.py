@@ -237,3 +237,35 @@ class SocialRepositoryProtocol(Protocol):
         Returns True if newly deleted or already deleted by owner, raises 403 on wrong author, 404 if not found.
         """
         ...
+
+    async def list_notifications(
+        self,
+        recipient_id: str,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns newest-first cursor-paginated notifications for recipient_id.
+        """
+        ...
+
+    async def get_unread_notification_count(
+        self,
+        recipient_id: str,
+    ) -> int:
+        """
+        Returns authoritative count of unread notifications for recipient_id.
+        """
+        ...
+
+    async def mark_notifications_read(
+        self,
+        recipient_id: str,
+        notification_id: Optional[str] = None,
+    ) -> Tuple[int, int]:
+        """
+        Marks a specific notification or all unread notifications for recipient as read.
+        Returns (marked_count, remaining_unread_count).
+        """
+        ...
+

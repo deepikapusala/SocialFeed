@@ -9,6 +9,7 @@ from app.models.post import Post
 from app.models.media import PostMedia
 from app.models.like import PostLike
 from app.models.follow import Follow
+from app.models.notification import Notification
 
 __all__ = [
     "Base",
@@ -18,4 +19,6 @@ __all__ = [
     "PostMedia",
     "PostLike",
     "Follow",
+    "Notification",
 ]
+

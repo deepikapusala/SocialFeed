@@ -6,6 +6,7 @@ SQLAlchemy 2.x async ORM and Core against PostgreSQL (instagram_modeling).
 Reference: docs/05_Python_Database_Integration_PRD.md
 """
 
+import inspect
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -24,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
 from app.common.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
-from app.models import Follow, Post, PostLike, PostMedia, Session, User
+from app.models import Follow, Notification, Post, PostLike, PostMedia, Session, User
 
 
 class PostgresRepository:
@@ -783,6 +784,22 @@ class PostgresRepository:
             )
             self._session.add(post)
             await self._session.flush()
+
+            # Trigger notification for reply
+            parent_post = None
+            if hasattr(self._session, "get"):
+                res = self._session.get(Post, uuid.UUID(reply_to_id))
+                if inspect.isawaitable(res):
+                    parent_post = await res
+            if parent_post:
+                await self._create_notification(
+                    recipient_id=parent_post.author_id,
+                    actor_id=author_uuid,
+                    event_type="reply",
+                    target_post_id=post_uuid,
+                )
+
+            await self._session.flush()
             return await self.get_post_detail(str(post_uuid), viewer_id=author_id)  # type: ignore
 
         elif kind == "repost":
@@ -815,6 +832,21 @@ class PostgresRepository:
                 created_at=now,
             )
             self._session.add(post)
+
+            # Trigger notification for repost
+            target_post = None
+            if hasattr(self._session, "get"):
+                res = self._session.get(Post, target_uuid)
+                if inspect.isawaitable(res):
+                    target_post = await res
+            if target_post:
+                await self._create_notification(
+                    recipient_id=target_post.author_id,
+                    actor_id=author_uuid,
+                    event_type="repost",
+                    target_post_id=target_uuid,
+                )
+
             try:
                 await self._session.flush()
             except IntegrityError as exc:
@@ -846,6 +878,20 @@ class PostgresRepository:
                 created_at=datetime.now(),
             ).on_conflict_do_nothing(index_elements=["user_id", "post_id"])
             await self._session.execute(stmt)
+
+        # Trigger notification for like
+        target_post = None
+        if hasattr(self._session, "get"):
+            res = self._session.get(Post, post_uuid)
+            if inspect.isawaitable(res):
+                target_post = await res
+        if target_post:
+            await self._create_notification(
+                recipient_id=target_post.author_id,
+                actor_id=user_uuid,
+                event_type="like",
+                target_post_id=post_uuid,
+            )
 
         await self._session.flush()
         like_count = await self.get_like_count(post_id)
@@ -975,6 +1021,15 @@ class PostgresRepository:
         res_status = await self._session.execute(status_stmt)
         actual_status = res_status.scalar() or desired_status
 
+        if actual_status == "accepted":
+            await self._create_notification(
+                recipient_id=following_uuid,
+                actor_id=follower_uuid,
+                event_type="follow",
+                target_post_id=None,
+            )
+            await self._session.commit()
+
         count_stmt = select(func.count(Follow.follower_id)).where(
             and_(
                 Follow.following_id == following_uuid,
@@ -1039,8 +1094,18 @@ class PostgresRepository:
             .values(status="accepted")
         )
         res = await self._session.execute(stmt)
-        await self._session.commit()
         is_accepted = bool(res.rowcount > 0)
+
+        if is_accepted:
+            # Recipient of follow_accepted is the original requester
+            await self._create_notification(
+                recipient_id=requester_uuid,
+                actor_id=target_uuid,
+                event_type="follow_accepted",
+                target_post_id=None,
+            )
+
+        await self._session.commit()
 
         count_stmt = select(func.count(Follow.follower_id)).where(
             and_(
@@ -1258,6 +1323,20 @@ class PostgresRepository:
                 created_at=datetime.now(),
             )
             await self._session.execute(stmt)
+
+            target_post = None
+            if hasattr(self._session, "get"):
+                res = self._session.get(Post, post_uuid)
+                if inspect.isawaitable(res):
+                    target_post = await res
+            if target_post:
+                await self._create_notification(
+                    recipient_id=target_post.author_id,
+                    actor_id=user_uuid,
+                    event_type="repost",
+                    target_post_id=post_uuid,
+                )
+
             await self._session.commit()
 
         repost_count = await self.get_repost_count(post_id)
@@ -1446,5 +1525,173 @@ class PostgresRepository:
         post.deleted_at = datetime.now()
         await self._session.commit()
         return True
+
+    # -----------------------------------------------------------------------
+    # Stage 6 Notification Inbox Implementation
+    # -----------------------------------------------------------------------
+    async def _create_notification(
+        self,
+        recipient_id: uuid.UUID,
+        actor_id: uuid.UUID,
+        event_type: str,
+        target_post_id: Optional[uuid.UUID] = None,
+    ) -> None:
+        """
+        Creates an event notification within the current transaction.
+        Enforces self-notification suppression and idempotent deduplication.
+        """
+        if recipient_id == actor_id:
+            return
+
+        stmt = (
+            pg_insert(Notification)
+            .values(
+                id=uuid.uuid4(),
+                recipient_id=recipient_id,
+                actor_id=actor_id,
+                event_type=event_type,
+                target_post_id=target_post_id,
+                created_at=datetime.now(),
+            )
+            .on_conflict_do_nothing(index_elements=["recipient_id", "actor_id", "event_type", "target_post_id"])
+        )
+        await self._session.execute(stmt)
+
+    async def list_notifications(
+        self,
+        recipient_id: str,
+        cursor_tuple: Optional[Tuple[datetime, str]] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieves cursor-paginated notifications for recipient_id ordered by (created_at DESC, id DESC).
+        Includes actor information and target post information (with tombstone display if deleted).
+        """
+        recipient_uuid = uuid.UUID(recipient_id)
+
+        stmt = (
+            select(Notification)
+            .options(
+                selectinload(Notification.actor),
+                selectinload(Notification.target_post),
+            )
+            .where(Notification.recipient_id == recipient_uuid)
+            .order_by(Notification.created_at.desc(), Notification.id.desc())
+            .limit(limit + 1)
+        )
+
+        if cursor_tuple is not None:
+            c_time, c_id = cursor_tuple
+            c_uuid = uuid.UUID(c_id)
+            stmt = stmt.where(
+                or_(
+                    Notification.created_at < c_time,
+                    and_(
+                        Notification.created_at == c_time,
+                        Notification.id < c_uuid,
+                    ),
+                )
+            )
+
+        res = await self._session.execute(stmt)
+        rows = res.scalars().all()
+
+        results = []
+        for n in rows:
+            target_post_data = None
+            if n.target_post_id is not None:
+                if n.target_post:
+                    is_del = n.target_post.deleted_at is not None
+                    target_post_data = {
+                        "id": str(n.target_post.id),
+                        "kind": n.target_post.kind if not is_del else None,
+                        "text": n.target_post.text if not is_del else "[Deleted]",
+                        "isDeleted": is_del,
+                    }
+                else:
+                    target_post_data = {
+                        "id": str(n.target_post_id),
+                        "kind": None,
+                        "text": "[Deleted]",
+                        "isDeleted": True,
+                    }
+
+            results.append({
+                "id": str(n.id),
+                "eventType": n.event_type,
+                "createdAt": n.created_at.isoformat().replace("+00:00", "Z") if hasattr(n.created_at, "isoformat") else str(n.created_at),
+                "readAt": n.read_at.isoformat().replace("+00:00", "Z") if (n.read_at and hasattr(n.read_at, "isoformat")) else (str(n.read_at) if n.read_at else None),
+                "isRead": n.read_at is not None,
+                "actor": self._format_author_dict(n.actor),
+                "targetPost": target_post_data,
+            })
+        return results
+
+    async def get_unread_notification_count(
+        self,
+        recipient_id: str,
+    ) -> int:
+        """
+        Returns authoritative count of unread notifications for recipient_id.
+        """
+        recipient_uuid = uuid.UUID(recipient_id)
+        stmt = (
+            select(func.count(Notification.id))
+            .where(
+                and_(
+                    Notification.recipient_id == recipient_uuid,
+                    Notification.read_at.is_(None),
+                )
+            )
+        )
+        res = await self._session.execute(stmt)
+        return res.scalar() or 0
+
+    async def mark_notifications_read(
+        self,
+        recipient_id: str,
+        notification_id: Optional[str] = None,
+    ) -> Tuple[int, int]:
+        """
+        Marks single notification or all unread notifications for recipient as read.
+        Returns (marked_count, remaining_unread_count).
+        """
+        recipient_uuid = uuid.UUID(recipient_id)
+        now = datetime.now()
+
+        if notification_id is not None:
+            notif_uuid = uuid.UUID(notification_id)
+            notif = await self._session.get(Notification, notif_uuid)
+            if not notif:
+                raise NotFoundError("Notification not found", details=[{"field": "notificationId", "reason": "not_found"}])
+            if notif.recipient_id != recipient_uuid:
+                raise ForbiddenError("Forbidden access to notification", details=[{"field": "notificationId", "reason": "wrong_recipient"}])
+
+            marked_count = 0
+            if notif.read_at is None:
+                notif.read_at = now
+                marked_count = 1
+                await self._session.commit()
+
+            unread = await self.get_unread_notification_count(recipient_id)
+            return marked_count, unread
+        else:
+            stmt = (
+                update(Notification)
+                .where(
+                    and_(
+                        Notification.recipient_id == recipient_uuid,
+                        Notification.read_at.is_(None),
+                    )
+                )
+                .values(read_at=now)
+            )
+            res = await self._session.execute(stmt)
+            marked_count = res.rowcount or 0
+            await self._session.commit()
+
+            unread = await self.get_unread_notification_count(recipient_id)
+            return marked_count, unread
+
 
 

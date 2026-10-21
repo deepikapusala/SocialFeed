@@ -572,3 +572,66 @@ class SocialService:
             author_id=clean_author_id,
         )
 
+    async def list_notifications(
+        self,
+        recipient_id: str,
+        cursor_str: Optional[str] = None,
+        limit: int = 10,
+    ) -> Any:
+        """
+        Retrieves cursor-paginated notification inbox for authenticated recipient.
+        """
+        clean_recipient_id = self._validate_uuid(recipient_id, "recipient_id")
+        clean_limit = self._validate_limit(limit)
+
+        cursor_tuple = None
+        if cursor_str:
+            try:
+                cursor_tuple = decode_cursor(cursor_str)
+            except InvalidCursorError as e:
+                raise ValidationError(f"Invalid cursor: {e}", details=[{"field": "cursor", "reason": "invalid_cursor"}])
+
+        raw_notifications = await self._repository.list_notifications(
+            recipient_id=clean_recipient_id,
+            cursor_tuple=cursor_tuple,
+            limit=clean_limit,
+        )
+        unread_count = await self._repository.get_unread_notification_count(clean_recipient_id)
+
+        if len(raw_notifications) > clean_limit:
+            page_records = raw_notifications[:clean_limit]
+            has_more = True
+            last_record = page_records[-1]
+            next_cursor = encode_cursor(last_record["createdAt"], last_record["id"])
+        else:
+            page_records = raw_notifications
+            has_more = False
+            next_cursor = None
+
+        from app.schemas.notification import NotificationItem, NotificationListResponse
+        return NotificationListResponse(
+            items=[NotificationItem(**n) for n in page_records],
+            unread_count=unread_count,
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
+
+    async def mark_notifications_read(
+        self,
+        recipient_id: str,
+        notification_id: Optional[str] = None,
+    ) -> Any:
+        """
+        Marks single or all unread notifications as read.
+        """
+        clean_recipient_id = self._validate_uuid(recipient_id, "recipient_id")
+        clean_notif_id = self._validate_uuid(notification_id, "notification_id") if notification_id else None
+
+        marked, unread = await self._repository.mark_notifications_read(
+            recipient_id=clean_recipient_id,
+            notification_id=clean_notif_id,
+        )
+        from app.schemas.notification import MarkReadResponse
+        return MarkReadResponse(marked_count=marked, unread_count=unread)
+
+
