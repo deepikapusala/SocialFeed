@@ -66,9 +66,10 @@ def create_app() -> FastAPI:
     # Note: Starlette executes middleware in reverse addition order.
     # CORSMiddleware added first, then RequestIdMiddleware added outermost.
     allowed_origins = [o.strip() for o in settings.FRONTEND_ORIGIN.split(",") if o.strip()]
-    for dev_origin in ("http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"):
-        if dev_origin not in allowed_origins:
-            allowed_origins.append(dev_origin)
+    if settings.ENVIRONMENT != "production":
+        for dev_origin in ("http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"):
+            if dev_origin not in allowed_origins:
+                allowed_origins.append(dev_origin)
 
     app.add_middleware(
         CORSMiddleware,

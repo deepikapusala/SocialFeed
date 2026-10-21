@@ -9,6 +9,7 @@ from app.schemas.health import HealthResponse
 router = APIRouter(tags=["health"])
 
 
+@router.get("/health", response_model=HealthResponse)
 @router.get("/health/live", response_model=HealthResponse)
 async def get_health_live() -> HealthResponse:
     """

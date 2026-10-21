@@ -22,6 +22,11 @@ class Settings(BaseSettings):
         description="Local HTTP server listening port",
     )
 
+    ENVIRONMENT: str = Field(
+        default="development",
+        description="Runtime environment (development, test, staging, production)",
+    )
+
     FRONTEND_ORIGIN: str = Field(
         default="http://localhost:3000",
         description="Allowed frontend CORS origin",

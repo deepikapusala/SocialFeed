@@ -9,7 +9,7 @@ Defines dependency providers for:
 """
 
 import uuid
-from typing import Any
+from typing import Any, Optional
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,12 +93,17 @@ async def get_current_actor_id(
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     settings: Settings = Depends(get_settings),
-) -> str:
+) -> Optional[str]:
     """
     Resolves the actor ID for routes that support both authenticated and development actors.
     1. If 'Authorization: Bearer <token>' is provided, resolves actor from verified session.
-    2. If 'x-viewer-id' header is provided with valid UUID (tests), returns it.
-    3. Falls back to DEMO_USER_ID from settings for Stage A/C V1 backwards compatibility.
+    2. In non-production environments (test/development):
+       - If 'x-viewer-id' header is provided with valid UUID (tests), returns it.
+       - Falls back to DEMO_USER_ID from settings for Stage A/C V1 backwards compatibility.
+    3. In production environment:
+       - Test shortcuts ('x-viewer-id' and DEMO_USER_ID) are strictly disabled.
+       - Mutations (POST/PATCH/PUT/DELETE) require Bearer auth (401 Unauthorized if missing).
+       - Safe reads without token return None (anonymous viewer).
     """
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
@@ -107,15 +112,24 @@ async def get_current_actor_id(
             user = await auth_service.verify_session_token(raw_token)
             return str(user.id)
 
-    header_val = request.headers.get("x-viewer-id")
-    if header_val:
-        try:
-            uuid.UUID(header_val)
-            return header_val
-        except ValueError:
-            pass
+    if settings.ENVIRONMENT != "production":
+        header_val = request.headers.get("x-viewer-id")
+        if header_val:
+            try:
+                uuid.UUID(header_val)
+                return header_val
+            except ValueError:
+                pass
+        return settings.DEMO_USER_ID
 
-    return settings.DEMO_USER_ID
+    # Production environment protections
+    if request.method in ("POST", "PATCH", "PUT", "DELETE"):
+        raise UnauthorizedError(
+            "Authentication required",
+            details=[{"field": "Authorization", "reason": "missing_bearer_token"}],
+        )
+
+    return None
 
 
 def get_request_id(request: Request) -> str:
