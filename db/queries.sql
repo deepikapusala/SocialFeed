@@ -84,7 +84,7 @@ SELECT
     COUNT(pl.user_id) AS no_of_likes
 FROM posts p
 LEFT JOIN post_likes pl
-    ON p.id = pl.post_id
+    ON p.id = pl.post_id 
 GROUP BY p.id
 HAVING COUNT(pl.user_id) > 2;
 

@@ -6,7 +6,16 @@ import './TopBar.css';
  * - Search bar: Type tag (e.g. #art, #nature) or press Enter to filter posts.
  * - Toggle button: Switch between Dark Mode (Pure Black 🌙) and Light Mode (Baby Pink 🌸).
  */
-export function TopBar({ searchQuery, onSearchChange, onClearSearch, theme, onToggleTheme }) {
+export function TopBar({
+  searchQuery,
+  onSearchChange,
+  onClearSearch,
+  theme,
+  onToggleTheme,
+  currentUser,
+  onOpenAuth,
+  onLogout,
+}) {
   // Prevent form submission page refresh when pressing Enter
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -51,6 +60,46 @@ export function TopBar({ searchQuery, onSearchChange, onClearSearch, theme, onTo
             </button>
           )}
         </form>
+
+        {/* Middle: Auth Box (Sign In / Sign Up OR User Profile) */}
+        <div className="topbar__auth-wrapper">
+          {currentUser ? (
+            <div className="topbar__user-chip">
+              <img
+                src={
+                  currentUser.avatar?.smallUrl ||
+                  currentUser.avatar?.largeUrl ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+                }
+                alt={currentUser.handle}
+                className="topbar__user-avatar"
+              />
+              <div className="topbar__user-meta">
+                <span className="topbar__user-handle">@{currentUser.handle}</span>
+                <span className="topbar__user-badge">Following feed</span>
+              </div>
+              <button
+                type="button"
+                className="topbar__logout-btn"
+                onClick={onLogout}
+                title="Sign out of account"
+              >
+                Log Out
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="topbar__signin-btn"
+              onClick={onOpenAuth}
+              title="Sign in or register demo user"
+            >
+              <span className="topbar__signin-icon">🔑</span>
+              <span className="topbar__signin-text">Sign In / Sign Up</span>
+              <span className="topbar__signin-badge">5 Profiles</span>
+            </button>
+          )}
+        </div>
 
         {/* Right / Center-right: Theme Toggle (Dark Mode 🌙 / Baby Pink 🌸) */}
         <div className="topbar__theme-wrapper">

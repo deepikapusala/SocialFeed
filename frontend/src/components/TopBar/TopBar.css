@@ -91,6 +91,116 @@
 }
 
 /* ==========================================================================
+   Auth Box (Center - Between Search and Theme Toggle)
+   ========================================================================== */
+
+.topbar__auth-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.topbar__signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  background-color: var(--color-bg-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 2px 8px var(--color-shadow);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.topbar__signin-btn:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 64, 129, 0.2);
+}
+
+.topbar__signin-btn:active {
+  transform: translateY(1px);
+}
+
+.topbar__signin-icon {
+  font-size: 1rem;
+}
+
+.topbar__signin-badge {
+  font-size: 0.72rem;
+  background-color: var(--color-accent);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Logged-in User Profile Chip */
+.topbar__user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px 5px 6px;
+  background-color: var(--color-bg-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  box-shadow: 0 2px 8px var(--color-shadow);
+}
+
+.topbar__user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 1.5px solid var(--color-accent);
+}
+
+.topbar__user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  text-align: left;
+}
+
+.topbar__user-handle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.topbar__user-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.topbar__logout-btn {
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-left: 4px;
+}
+
+.topbar__logout-btn:hover {
+  background-color: rgba(255, 68, 68, 0.15);
+  color: #ff5252;
+  border-color: #ff5252;
+}
+
+/* ==========================================================================
    Theme Toggle Button (Right / Center - Dark Mode vs Baby Pink)
    ========================================================================== */
 

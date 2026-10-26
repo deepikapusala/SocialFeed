@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getResponsiveSrcSet } from '../../utils/images';
-import { toggleLikeApi, toggleRepostApi, fetchRepliesApi, createReplyApi } from '../../utils/api';
+import { toggleLikeApi, toggleRepostApi, fetchRepliesApi, createReplyApi, getStoredUser } from '../../utils/api';
 import './PhotoViewer.css';
 
 /**
@@ -18,7 +18,11 @@ export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
 
   const authorId = post.authorId || post.author?.id;
   const authorHandle = post.username || post.author?.handle || 'user';
-  const isSelf = authorId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' || authorHandle.toLowerCase() === 'asha';
+  const storedUser = getStoredUser();
+  const storedHandle = storedUser?.handle?.toLowerCase();
+  const isSelf = storedHandle
+    ? authorHandle.toLowerCase() === storedHandle
+    : (authorHandle.toLowerCase() === 'asha' || authorId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   const isFollowing = Boolean(post.followedByViewer || post.author?.followedByViewer);
 
   const handleFollowClick = (e) => {

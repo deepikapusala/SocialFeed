@@ -6,6 +6,131 @@
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+export const AUTH_TOKEN_KEY = 'ig_auth_token';
+export const AUTH_USER_KEY = 'ig_auth_user';
+
+export function getAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthSession(token, user) {
+  try {
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    }
+    if (user) {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    }
+  } catch (e) {
+    console.error('Failed to save auth session:', e);
+  }
+}
+
+export function clearAuthSession() {
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
+  } catch (e) {
+    console.error('Failed to clear auth session:', e);
+  }
+}
+
+export function getAuthHeaders() {
+  const token = getAuthToken();
+  const headers = { 'Accept': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/**
+ * Signs in with handle and password.
+ */
+export async function loginApi({ handle, password }) {
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      handle: handle.trim().toLowerCase(),
+      password,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = data?.error?.message || data?.detail || `Sign in failed (${response.status})`;
+    throw new Error(msg);
+  }
+
+  setAuthSession(data.accessToken, data.user);
+  return data;
+}
+
+/**
+ * Registers a new account.
+ */
+export async function registerApi({ handle, displayName, password }) {
+  const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      handle: handle.trim().toLowerCase(),
+      displayName: displayName.trim(),
+      password,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = data?.error?.message || data?.detail || `Sign up failed (${response.status})`;
+    throw new Error(msg);
+  }
+
+  setAuthSession(data.accessToken, data.user);
+  return data;
+}
+
+/**
+ * Logs out and invalidates session token.
+ */
+export async function logoutApi() {
+  const token = getAuthToken();
+  if (token) {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+    } catch (e) {
+      console.warn('Logout API warning:', e);
+    }
+  }
+  clearAuthSession();
+}
+
 /**
  * Normalizes a PostItem into a UI-friendly post object.
  * Ensures every post preserves its exact 3-image media array.
@@ -21,13 +146,28 @@ export function normalizePostItem(item) {
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
   const avatarUrl = item.author?.avatar?.smallUrl || item.author?.avatar?.largeUrl || item.userAvatar || defaultAvatar;
 
+  let category = item.category || 'Explore';
+  const handle = (item.author?.handle || item.username || '').toLowerCase();
+  const text = (item.text || item.caption || '').toLowerCase();
+  if (handle === 'deepu' || text.includes('food') || text.includes('pasta') || text.includes('burger') || text.includes('ramen')) {
+    category = 'Food';
+  } else if (handle === 'sneha' || text.includes('flower') || text.includes('tulip') || text.includes('rose') || text.includes('peon')) {
+    category = 'Flowers';
+  } else if (handle === 'asha' || text.includes('book') || text.includes('study') || text.includes('read') || text.includes('library')) {
+    category = 'Books & Study';
+  } else if (handle === 'ani' || text.includes('music') || text.includes('guitar') || text.includes('piano') || text.includes('synth')) {
+    category = 'Music';
+  } else if (handle === 'virat' || text.includes('cricket') || text.includes('stadium') || text.includes('bat') || text.includes('pitch')) {
+    category = 'Cricket';
+  }
+
   return {
     ...item,
     id: item.id,
     kind: item.kind || 'original',
     text: item.text || item.caption || '',
     caption: item.caption || item.text || '',
-    category: item.category || 'Explore',
+    category: category,
     username: item.author?.handle || item.username || 'user',
     displayName: item.author?.displayName || item.displayName || item.author?.handle || 'User',
     userAvatar: avatarUrl,
@@ -62,9 +202,7 @@ export async function toggleRepostApi(postId, shouldRepost) {
   const method = shouldRepost ? 'POST' : 'DELETE';
   const response = await fetch(`${API_BASE_URL}/posts/${postId}/repost`, {
     method: method,
-    headers: {
-      'Accept': 'application/json',
-    },
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -86,9 +224,7 @@ export async function toggleFollowApi(userId, shouldFollow) {
   const method = shouldFollow ? 'PUT' : 'DELETE';
   const response = await fetch(`${API_BASE_URL}/users/${userId}/follow`, {
     method: method,
-    headers: {
-      'Accept': 'application/json',
-    },
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -143,9 +279,7 @@ export async function fetchFeedFromApi(cursor = null, limit = 10) {
 
   const response = await fetch(url.toString(), {
     method: 'GET',
-    headers: {
-      'Accept': 'application/json',
-    },
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -178,9 +312,7 @@ export async function toggleLikeApi(postId, shouldLike) {
   const method = shouldLike ? 'PUT' : 'DELETE';
   const response = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
     method: method,
-    headers: {
-      'Accept': 'application/json',
-    },
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -233,12 +365,14 @@ export async function fetchRepliesApi(postId, cursor = null, limit = 20) {
  * @returns {Promise<Object>}
  */
 export async function createReplyApi(postId, text) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+  };
+
   const response = await fetch(`${API_BASE_URL}/posts`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+    headers: headers,
     body: JSON.stringify({
       kind: 'reply',
       text: text,

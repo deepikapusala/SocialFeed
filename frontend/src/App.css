@@ -12,6 +12,27 @@
 }
 
 /* ==========================================================================
+   Feed Scope Banner
+   ========================================================================== */
+.app__feed-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  margin: 0 auto var(--space-md);
+  background: linear-gradient(135deg, rgba(255, 64, 129, 0.12), rgba(120, 80, 240, 0.12));
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  box-shadow: 0 2px 8px var(--color-shadow);
+}
+
+.app__feed-banner-icon {
+  font-size: 1rem;
+}
+
+/* ==========================================================================
    Empty Search Results State
    ========================================================================== */
 .app__empty-search {

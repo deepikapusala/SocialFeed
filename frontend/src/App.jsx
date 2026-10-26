@@ -2,7 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TopBar } from './components/TopBar/TopBar';
 import { PhotoGrid } from './components/PhotoGrid/PhotoGrid';
 import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
-import { fetchFeedFromApi, toggleFollowApi, fetchPostDetailApi } from './utils/api';
+import { AuthModal } from './components/AuthModal/AuthModal';
+import {
+  fetchFeedFromApi,
+  toggleFollowApi,
+  fetchPostDetailApi,
+  getStoredUser,
+  logoutApi,
+} from './utils/api';
 import './App.css';
 
 /**
@@ -25,6 +32,10 @@ export function App() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Authentication state
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Search query state
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,19 +183,17 @@ export function App() {
 
   /**
    * Fetch a batch of posts from FastAPI backend API.
+   * If reset is true, ignores previous cursor and starts from page 1.
    */
-  const loadPosts = useCallback(async (isInitial = false) => {
-    if (loading) return;
-    const currentCursor = isInitial ? null : cursor;
-    if (!isInitial && !hasMore) return;
-
+  const fetchFeedBatch = useCallback(async (reset = false, targetCursor = null) => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await fetchFeedFromApi(currentCursor, 10);
+      const activeCursor = reset ? null : targetCursor;
+      const result = await fetchFeedFromApi(activeCursor, 10);
       setPosts((prev) => {
-        if (isInitial || currentCursor === null) {
+        if (reset || activeCursor === null) {
           return result.items;
         }
         // Deduplicate incoming items by id
@@ -204,15 +213,38 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  }, [cursor, hasMore, loading]);
+  }, []);
+
+  const loadPosts = useCallback((isInitial = false) => {
+    if (loading) return;
+    if (!isInitial && !hasMore) return;
+    fetchFeedBatch(isInitial, isInitial ? null : cursor);
+  }, [loading, hasMore, cursor, fetchFeedBatch]);
 
   // Initial load on page mount
   useEffect(() => {
-    loadPosts(true);
-  }, []);
+    fetchFeedBatch(true, null);
+  }, [fetchFeedBatch]);
+
+  /**
+   * Authentication handlers
+   */
+  const handleAuthSuccess = useCallback((user) => {
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+    // Reload feed immediately to display following feed for authenticated user
+    fetchFeedBatch(true, null);
+  }, [fetchFeedBatch]);
+
+  const handleLogout = useCallback(async () => {
+    await logoutApi();
+    setCurrentUser(null);
+    // Reload feed immediately to restore default public explore feed
+    fetchFeedBatch(true, null);
+  }, [fetchFeedBatch]);
 
   const handleRetry = () => {
-    loadPosts(posts.length === 0);
+    fetchFeedBatch(posts.length === 0, cursor);
   };
 
   // -------------------------------------------------------------
@@ -252,16 +284,46 @@ export function App() {
     setSelectedPost((prev) => (prev && prev.id === postId ? { ...prev, ...updates } : prev));
   }, []);
 
+  const getProfileNiche = (handle) => {
+    switch (handle?.toLowerCase()) {
+      case 'deepu':
+        return 'Food & Culinary feed (12 Posts)';
+      case 'sneha':
+        return 'Flowers & Botanical feed (12 Posts)';
+      case 'asha':
+        return 'Books, Reading & Study feed (12 Posts)';
+      case 'ani':
+        return 'Music & Musical Instruments feed (12 Posts)';
+      case 'virat':
+        return 'Cricket & Sports feed (12 Posts)';
+      default:
+        return 'Personalized Following feed';
+    }
+  };
+
   return (
     <div className="app">
-      {/* Top Header Bar: Search on Left/Center, Theme Toggle on Right/Center */}
+      {/* Top Header Bar: Search on Left, Auth in Middle, Theme Toggle on Right */}
       <TopBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onClearSearch={() => setSearchQuery('')}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
       />
+
+      {/* Personalized feed confirmation banner when logged in */}
+      {currentUser && (
+        <div className="app__feed-banner" role="status">
+          <span className="app__feed-banner-icon">✨</span>
+          <span>
+            Logged in as <strong>@{currentUser.handle}</strong> &mdash; Showing {getProfileNiche(currentUser.handle)}
+          </span>
+        </div>
+      )}
 
       {/* Primary Error Banner when initial feed load fails */}
       {error && posts.length === 0 && (
@@ -327,6 +389,13 @@ export function App() {
           onToggleFollow={handleToggleFollow}
         />
       )}
+
+      {/* Sign In / Sign Up Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
     </div>
   );
 }
