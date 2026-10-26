@@ -1,0 +1,255 @@
+/* ==========================================================================
+   SuggestedProfiles Sidebar Styles
+   Explore More Profiles right-hand panel
+   ========================================================================== */
+
+.suggested-sidebar {
+  width: 100%;
+  max-width: 330px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Logged In Active User Card */
+.suggested-sidebar__my-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 2px 8px var(--color-shadow);
+  margin-bottom: 4px;
+}
+
+.suggested-sidebar__my-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid var(--color-accent);
+}
+
+.suggested-sidebar__my-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.suggested-sidebar__my-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggested-sidebar__my-handle {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.suggested-sidebar__switch-btn {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.suggested-sidebar__switch-btn:hover {
+  background-color: var(--color-bg-elevated);
+}
+
+/* Header */
+.suggested-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.suggested-sidebar__title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggested-sidebar__icon {
+  font-size: 1.15rem;
+}
+
+.suggested-sidebar__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.suggested-sidebar__count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background-color: var(--color-bg-elevated);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+}
+
+.suggested-sidebar__subtitle {
+  margin: -6px 4px 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+/* Profiles List (5 boxes) */
+.suggested-sidebar__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggested-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 4px var(--color-shadow);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.suggested-profile-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 12px var(--color-shadow);
+}
+
+.suggested-profile-card__avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.suggested-profile-card__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 1.5px solid var(--color-border);
+  background-color: var(--color-bg-elevated);
+  display: block;
+}
+
+.suggested-profile-card__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.suggested-profile-card__names {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.suggested-profile-card__name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggested-profile-card__handle {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.suggested-profile-card__badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  letter-spacing: 0.02em;
+}
+
+/* Follow Button */
+.suggested-profile-card__follow-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+  user-select: none;
+  background-color: #0095f6;
+  color: #ffffff;
+}
+
+.suggested-profile-card__follow-btn:hover {
+  background-color: #1877f2;
+  transform: scale(1.03);
+}
+
+.suggested-profile-card__follow-btn:active {
+  transform: scale(0.97);
+}
+
+/* Following state */
+.suggested-profile-card__follow-btn--following {
+  background-color: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.suggested-profile-card__follow-btn--following:hover {
+  background-color: rgba(255, 68, 68, 0.15);
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+/* Footer Hint Box */
+.suggested-sidebar__hint-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(255, 64, 129, 0.08), rgba(120, 80, 240, 0.06));
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  margin-top: 4px;
+}
+
+.suggested-sidebar__hint-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.suggested-sidebar__hint-text {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.suggested-sidebar__hint-text strong {
+  color: var(--color-accent);
+}

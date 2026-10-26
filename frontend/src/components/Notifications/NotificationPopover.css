@@ -1,0 +1,370 @@
+/* ==========================================================================
+   NotificationPopover Component Styles
+   ========================================================================== */
+
+.notif-popover-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* ==========================================================================
+   Heart Icon Button
+   Matches Image 1 & Image 2
+   ========================================================================== */
+
+.topbar__heart-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.topbar__heart-btn:hover {
+  background-color: var(--color-bg-elevated);
+  transform: scale(1.05);
+}
+
+.topbar__heart-btn--active {
+  background-color: var(--color-bg-elevated);
+  border-color: var(--color-border);
+}
+
+.topbar__heart-svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--color-text-primary);
+  stroke-width: 2;
+  fill: none;
+  transition: stroke var(--transition-fast), transform var(--transition-fast);
+}
+
+.topbar__heart-btn:hover .topbar__heart-svg {
+  stroke: #ff2d55;
+  transform: scale(1.08);
+}
+
+/* ==========================================================================
+   Red Notification Dot
+   Matches Image 2 (red dot on top-right corner of heart)
+   ========================================================================== */
+
+.topbar__heart-red-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 9px;
+  height: 9px;
+  background-color: #ff3040;
+  border-radius: 50%;
+  border: 2px solid var(--color-bg-primary);
+  box-shadow: 0 0 6px rgba(255, 48, 64, 0.8);
+  animation: pulse-dot 2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes pulse-dot {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 48, 64, 0.7);
+  }
+  70% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 6px rgba(255, 48, 64, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 48, 64, 0);
+  }
+}
+
+/* ==========================================================================
+   Floating Red Notification Bubble Badge (Image 2 style)
+   ========================================================================== */
+
+.notif-bubble-badge {
+  position: absolute;
+  top: -10px;
+  right: -24px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: linear-gradient(135deg, #ff2d55, #ff416c);
+  color: #ffffff;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 12px rgba(255, 45, 85, 0.45);
+  pointer-events: none;
+  animation: bounce-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.notif-bubble-heart {
+  font-size: 0.65rem;
+}
+
+.notif-bubble-count {
+  line-height: 1;
+}
+
+@keyframes bounce-in {
+  from {
+    transform: scale(0.4) translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   Notifications Dropdown Panel
+   ========================================================================== */
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: -60px;
+  width: 360px;
+  max-width: 90vw;
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: popover-slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popover-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dropdown Header */
+.notif-dropdown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-bg-elevated);
+}
+
+.notif-dropdown__title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notif-dropdown__heart-icon {
+  font-size: 1.1rem;
+}
+
+.notif-dropdown__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.notif-dropdown__unread-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(255, 48, 64, 0.15);
+  color: #ff3b30;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+}
+
+.notif-dropdown__mark-all-btn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: opacity var(--transition-fast);
+}
+
+.notif-dropdown__mark-all-btn:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* Dropdown Body / Scroll Area */
+.notif-dropdown__body {
+  max-height: 380px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Empty State */
+.notif-dropdown__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.notif-dropdown__empty-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  opacity: 0.8;
+}
+
+.notif-dropdown__empty-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 4px;
+}
+
+.notif-dropdown__empty-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Notifications List */
+.notif-dropdown__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  position: relative;
+}
+
+.notif-item:last-child {
+  border-bottom: none;
+}
+
+.notif-item:hover {
+  background-color: var(--color-bg-elevated);
+}
+
+.notif-item--unread {
+  background-color: rgba(255, 48, 64, 0.05);
+}
+
+.notif-item--unread:hover {
+  background-color: rgba(255, 48, 64, 0.09);
+}
+
+/* Item Avatar & Badge */
+.notif-item__avatar-container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notif-item__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--color-border);
+  display: block;
+}
+
+.notif-item__badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 0.72rem;
+  background-color: var(--color-bg-primary);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Item Content */
+.notif-item__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-item__text {
+  font-size: 0.84rem;
+  color: var(--color-text-primary);
+  margin: 0 0 3px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.notif-item__text strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.notif-item__time {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+/* Unread indicator dot */
+.notif-item__unread-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff3040;
+  flex-shrink: 0;
+}
+
+/* Dropdown Footer */
+.notif-dropdown__footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-bg-elevated);
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.notif-dropdown__footer strong {
+  color: var(--color-text-primary);
+}
+
+/* Mobile Responsive */
+@media (max-width: 600px) {
+  .notif-dropdown {
+    right: -40px;
+    width: 320px;
+  }
+}

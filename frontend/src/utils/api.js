@@ -263,6 +263,8 @@ export function formatTimestamp(isoString) {
   }
 }
 
+export const formatRelativeTime = formatTimestamp;
+
 /**
  * Fetches paginated feed from FastAPI backend /feed endpoint.
  *
@@ -410,5 +412,74 @@ export async function fetchPostDetailApi(postId) {
 
   const data = await response.json();
   return normalizePostItem(data.item);
+}
+
+/**
+ * Fetches cursor-paginated notification inbox for current authenticated member.
+ *
+ * @param {string|null} cursor - Optional opaque pagination cursor token.
+ * @param {number} limit - Page size (1..50).
+ * @returns {Promise<{ items: Array, unreadCount: number, nextCursor: string|null, hasMore: boolean }>}
+ */
+export async function fetchNotificationsApi(cursor = null, limit = 20) {
+  const url = new URL(`${API_BASE_URL}/notifications`);
+  url.searchParams.set('limit', String(limit));
+  if (cursor) {
+    url.searchParams.set('cursor', cursor);
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    return { items: [], unreadCount: 0, nextCursor: null, hasMore: false };
+  }
+
+  const data = await response.json();
+  return {
+    items: data.items || [],
+    unreadCount: data.unreadCount || 0,
+    nextCursor: data.nextCursor || null,
+    hasMore: Boolean(data.hasMore),
+  };
+}
+
+/**
+ * Marks all notifications as read for current authenticated member.
+ *
+ * @returns {Promise<{ markedCount: number, unreadCount: number }>}
+ */
+export async function markAllNotificationsReadApi() {
+  const response = await fetch(`${API_BASE_URL}/notifications/read`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    return { markedCount: 0, unreadCount: 0 };
+  }
+
+  return await response.json();
+}
+
+/**
+ * Marks single notification as read.
+ *
+ * @param {string} notificationId - UUID of the notification.
+ * @returns {Promise<{ markedCount: number, unreadCount: number }>}
+ */
+export async function markSingleNotificationReadApi(notificationId) {
+  const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    return { markedCount: 0, unreadCount: 0 };
+  }
+
+  return await response.json();
 }
 

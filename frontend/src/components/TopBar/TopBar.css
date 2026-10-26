@@ -5,9 +5,9 @@
 
 .topbar {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: var(--space-md) var(--space-sm) var(--space-xs);
+  padding: var(--space-md) var(--space-md) var(--space-xs);
   box-sizing: border-box;
 }
 
@@ -198,6 +198,16 @@
   background-color: rgba(255, 68, 68, 0.15);
   color: #ff5252;
   border-color: #ff5252;
+}
+
+/* ==========================================================================
+   Notifications Heart Wrapper (Between Auth Box and Theme Toggle)
+   ========================================================================== */
+
+.topbar__notif-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
 }
 
 /* ==========================================================================

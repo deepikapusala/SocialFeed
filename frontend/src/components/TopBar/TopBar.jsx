@@ -1,4 +1,5 @@
 import React from 'react';
+import { NotificationPopover } from '../Notifications/NotificationPopover';
 import './TopBar.css';
 
 /**
@@ -15,6 +16,7 @@ export function TopBar({
   currentUser,
   onOpenAuth,
   onLogout,
+  onSelectPost,
 }) {
   // Prevent form submission page refresh when pressing Enter
   const handleSubmit = (e) => {
@@ -99,6 +101,15 @@ export function TopBar({
               <span className="topbar__signin-badge">5 Profiles</span>
             </button>
           )}
+        </div>
+
+        {/* Heart Notifications Icon (Between Sign In/Up Box and Theme Toggle) */}
+        <div className="topbar__notif-wrapper">
+          <NotificationPopover
+            currentUser={currentUser}
+            onOpenAuth={onOpenAuth}
+            onSelectPost={onSelectPost}
+          />
         </div>
 
         {/* Right / Center-right: Theme Toggle (Dark Mode 🌙 / Baby Pink 🌸) */}

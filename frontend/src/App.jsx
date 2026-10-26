@@ -3,6 +3,7 @@ import { TopBar } from './components/TopBar/TopBar';
 import { PhotoGrid } from './components/PhotoGrid/PhotoGrid';
 import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
 import { AuthModal } from './components/AuthModal/AuthModal';
+import { SuggestedProfiles } from './components/SuggestedProfiles/SuggestedProfiles';
 import {
   fetchFeedFromApi,
   toggleFollowApi,
@@ -40,10 +41,29 @@ export function App() {
   // Search query state
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Map of followed author handles for synced UI
+  const [followingMap, setFollowingMap] = useState({});
+
   // Theme state: 'dark' (pure black) vs 'light' (baby pink)
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('app-theme') || 'dark';
   });
+
+  // Synchronize followingMap from incoming posts
+  useEffect(() => {
+    if (currentUser) {
+      const initialMap = {};
+      posts.forEach((p) => {
+        const handle = (p.username || p.author?.handle)?.toLowerCase();
+        if (handle && p.followedByViewer !== undefined) {
+          initialMap[handle] = p.followedByViewer;
+        }
+      });
+      setFollowingMap((prev) => ({ ...initialMap, ...prev }));
+    } else {
+      setFollowingMap({});
+    }
+  }, [currentUser, posts]);
 
   // Apply theme to document
   useEffect(() => {
@@ -118,10 +138,18 @@ export function App() {
 
 
   /**
-   * Toggle follow state for an author across all posts synchronously.
+   * Toggle follow state for an author across all posts and sidebar synchronously.
    */
   const handleToggleFollow = useCallback(async ({ authorId, authorHandle, shouldFollow }) => {
-    // 1. Optimistic UI update across all posts authored by this user
+    // 1. Update followingMap immediately
+    if (authorHandle) {
+      setFollowingMap((prev) => ({
+        ...prev,
+        [authorHandle.toLowerCase()]: shouldFollow,
+      }));
+    }
+
+    // 2. Optimistic UI update across all posts authored by this user
     setPosts((prev) =>
       prev.map((p) => {
         const matchesId = authorId && (p.authorId === authorId || p.author?.id === authorId);
@@ -157,13 +185,19 @@ export function App() {
       return prev;
     });
 
-    // 2. Call backend API if authorId is available
+    // 3. Call backend API if authorId is available
     if (authorId) {
       try {
         await toggleFollowApi(authorId, shouldFollow);
       } catch (err) {
         console.error('Failed to toggle follow on server:', err);
         // Revert optimistic update on error
+        if (authorHandle) {
+          setFollowingMap((prev) => ({
+            ...prev,
+            [authorHandle.toLowerCase()]: !shouldFollow,
+          }));
+        }
         setPosts((prev) =>
           prev.map((p) => {
             const matchesId = p.authorId === authorId || p.author?.id === authorId;
@@ -313,6 +347,7 @@ export function App() {
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onLogout={handleLogout}
+        onSelectPost={handleSelectPost}
       />
 
       {/* Personalized feed confirmation banner when logged in */}
@@ -325,60 +360,73 @@ export function App() {
         </div>
       )}
 
-      {/* Primary Error Banner when initial feed load fails */}
-      {error && posts.length === 0 && (
-        <div className="app__error" role="alert">
-          <p>{error.message}</p>
-          {error.requestId && (
-            <p className="app__error-detail">Request ID: {error.requestId}</p>
+      <div className="app__content-layout">
+        <main className="app__feed-column">
+          {/* Primary Error Banner when initial feed load fails */}
+          {error && posts.length === 0 && (
+            <div className="app__error" role="alert">
+              <p>{error.message}</p>
+              {error.requestId && (
+                <p className="app__error-detail">Request ID: {error.requestId}</p>
+              )}
+              <button type="button" className="app__retry-btn" onClick={handleRetry}>
+                Retry
+              </button>
+            </div>
           )}
-          <button type="button" className="app__retry-btn" onClick={handleRetry}>
-            Retry
-          </button>
-        </div>
-      )}
 
-      {/* Message when no posts match search */}
-      {cleanQuery && filteredPosts.length === 0 && !loading && (
-        <div className="app__empty-search">
-          <p className="app__empty-title">No posts found for "{searchQuery}"</p>
-          <p className="app__empty-subtitle">
-            Try searching by tag, caption keyword, or handle...
-          </p>
-          <button
-            type="button"
-            className="app__clear-search-btn"
-            onClick={() => setSearchQuery('')}
-          >
-            Show All Posts
-          </button>
-        </div>
-      )}
-
-      {/* Main Post Grid */}
-      {(!error || posts.length > 0) && (
-        <PhotoGrid
-          posts={filteredPosts}
-          onSelectPost={handleSelectPost}
-          onToggleFollow={handleToggleFollow}
-          onLoadMore={() => loadPosts(false)}
-          hasMore={cleanQuery ? false : hasMore}
-          loading={loading}
-        />
-      )}
-
-      {/* Secondary Error Banner when subsequent page fails to load */}
-      {error && posts.length > 0 && (
-        <div className="app__error" role="alert">
-          <p>{error.message}</p>
-          {error.requestId && (
-            <p className="app__error-detail">Request ID: {error.requestId}</p>
+          {/* Message when no posts match search */}
+          {cleanQuery && filteredPosts.length === 0 && !loading && (
+            <div className="app__empty-search">
+              <p className="app__empty-title">No posts found for "{searchQuery}"</p>
+              <p className="app__empty-subtitle">
+                Try searching by tag, caption keyword, or handle...
+              </p>
+              <button
+                type="button"
+                className="app__clear-search-btn"
+                onClick={() => setSearchQuery('')}
+              >
+                Show All Posts
+              </button>
+            </div>
           )}
-          <button type="button" className="app__retry-btn" onClick={handleRetry}>
-            Retry Loading Next Page
-          </button>
-        </div>
-      )}
+
+          {/* Main Post Grid */}
+          {(!error || posts.length > 0) && (
+            <PhotoGrid
+              posts={filteredPosts}
+              onSelectPost={handleSelectPost}
+              onToggleFollow={handleToggleFollow}
+              onLoadMore={() => loadPosts(false)}
+              hasMore={cleanQuery ? false : hasMore}
+              loading={loading}
+            />
+          )}
+
+          {/* Secondary Error Banner when subsequent page fails to load */}
+          {error && posts.length > 0 && (
+            <div className="app__error" role="alert">
+              <p>{error.message}</p>
+              {error.requestId && (
+                <p className="app__error-detail">Request ID: {error.requestId}</p>
+              )}
+              <button type="button" className="app__retry-btn" onClick={handleRetry}>
+                Retry Loading Next Page
+              </button>
+            </div>
+          )}
+        </main>
+
+        <aside className="app__sidebar-column">
+          <SuggestedProfiles
+            currentUser={currentUser}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onToggleFollow={handleToggleFollow}
+            followingMap={followingMap}
+          />
+        </aside>
+      </div>
 
       {/* Carousel Modal Viewer */}
       {selectedPost && (
