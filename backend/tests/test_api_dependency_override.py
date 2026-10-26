@@ -19,10 +19,11 @@ class MockTestRepository(SocialRepositoryProtocol):
         cursor_tuple: Optional[Tuple[datetime, str]],
         limit: int,
         viewer_id: str,
+        scope: str = "home",
     ) -> List[Dict[str, Any]]:
         return [
             {
-                "id": "mock-feed-post-id-1",
+                "id": "11111111-1111-1111-1111-111111111101",
                 "kind": "original",
                 "text": "Overridden mock feed post",
                 "createdAt": datetime(2026, 9, 10, 12, 0, 0, tzinfo=timezone.utc),
@@ -31,11 +32,14 @@ class MockTestRepository(SocialRepositoryProtocol):
                     "handle": "mockuser",
                     "displayName": "Mock User",
                     "avatar": None,
+                    "followedByViewer": False,
                 },
                 "media": [],
                 "likeCount": 99,
                 "replyCount": 5,
+                "repostCount": 0,
                 "likedByViewer": True,
+                "repostedByViewer": False,
                 "replyToId": None,
                 "repostOfId": None,
             }
@@ -56,11 +60,14 @@ class MockTestRepository(SocialRepositoryProtocol):
                 "handle": "mockuser",
                 "displayName": "Mock User",
                 "avatar": None,
+                "followedByViewer": False,
             },
             "media": [],
             "likeCount": 42,
             "replyCount": 0,
+            "repostCount": 0,
             "likedByViewer": False,
+            "repostedByViewer": False,
             "replyToId": None,
             "repostOfId": None,
         }
@@ -79,7 +86,31 @@ class MockTestRepository(SocialRepositoryProtocol):
             "postCount": 100,
             "followerCount": 200,
             "followingCount": 300,
+            "followedByViewer": False,
+            "isPrivate": False,
+            "relationshipStatus": "none",
         }
+
+    async def follow_user(self, *args, **kwargs) -> Tuple[str, bool, int]:
+        return ("accepted", True, 1)
+
+    async def unfollow_user(self, *args, **kwargs) -> Tuple[str, bool, int]:
+        return ("none", False, 0)
+
+    async def accept_follow_request(self, *args, **kwargs) -> Tuple[bool, int]:
+        return (True, 1)
+
+    async def reject_follow_request(self, *args, **kwargs) -> bool:
+        return True
+
+    async def list_followers(self, *args, **kwargs) -> List[Dict[str, Any]]:
+        return []
+
+    async def list_following(self, *args, **kwargs) -> List[Dict[str, Any]]:
+        return []
+
+    async def is_following(self, *args, **kwargs) -> bool:
+        return False
 
     async def list_direct_replies(self, *args, **kwargs) -> List[Dict[str, Any]]:
         return []
@@ -93,8 +124,35 @@ class MockTestRepository(SocialRepositoryProtocol):
     async def user_exists(self, user_id: str) -> bool:
         return True
 
-    async def get_post_kind(self, post_id: str) -> Optional[str]:
+    async def get_post_kind(self, post_id: str, include_deleted: bool = False) -> Optional[str]:
         return "original"
+
+    async def create_repost(self, *args, **kwargs) -> Dict[str, Any]:
+        return {}
+
+    async def remove_repost(self, *args, **kwargs) -> Dict[str, Any]:
+        return {}
+
+    async def update_user_profile(self, *args, **kwargs) -> Optional[Dict[str, Any]]:
+        return None
+
+    async def deactivate_user(self, *args, **kwargs) -> bool:
+        return True
+
+    async def update_post(self, *args, **kwargs) -> Dict[str, Any]:
+        return {}
+
+    async def delete_post(self, *args, **kwargs) -> bool:
+        return True
+
+    async def list_notifications(self, *args, **kwargs) -> List[Dict[str, Any]]:
+        return []
+
+    async def get_unread_notification_count(self, *args, **kwargs) -> int:
+        return 0
+
+    async def mark_notifications_read(self, *args, **kwargs) -> Tuple[int, int]:
+        return (0, 0)
 
 
 def test_repository_dependency_override_on_feed(app, client: TestClient):
