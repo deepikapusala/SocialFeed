@@ -430,11 +430,12 @@ class FixtureRepository:
     ) -> List[Dict[str, Any]]:
         await self._simulate_io()
         clean_query = query.strip().lower()
+        raw_term = clean_query.lstrip("#").lstrip("@")
 
-        # Case-insensitive literal substring match on original post text
+        # Case-insensitive literal substring match on original post text (both with and without leading #)
         matches = [
             p for p in self._originals
-            if p.get("text") and clean_query in p["text"].lower()
+            if p.get("text") and (clean_query in p["text"].lower() or raw_term in p["text"].lower())
         ]
         matches.sort(key=lambda p: (p["createdAt"], p["id"]), reverse=True)
 

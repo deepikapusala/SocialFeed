@@ -647,6 +647,7 @@ class PostgresRepository:
     ) -> List[Dict[str, Any]]:
         viewer_uuid = uuid.UUID(viewer_id)
         clean_query = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        raw_term = clean_query.lstrip("#").lstrip("@")
 
         reply_post = aliased(Post)
         like_count_sq = (
@@ -676,6 +677,13 @@ class PostgresRepository:
             ).scalar_subquery()
         )
 
+        search_filter = or_(
+            Post.text.ilike(f"%{clean_query}%"),
+            Post.text.ilike(f"%{raw_term}%"),
+            User.handle.ilike(f"%{raw_term}%"),
+            User.display_name.ilike(f"%{raw_term}%"),
+        )
+
         stmt = (
             select(
                 Post,
@@ -683,6 +691,7 @@ class PostgresRepository:
                 reply_count_sq.label("reply_count"),
                 liked_by_viewer_sq.label("liked_by_viewer"),
             )
+            .join(Post.author)
             .options(
                 selectinload(Post.author),
                 selectinload(Post.media),
@@ -691,7 +700,7 @@ class PostgresRepository:
                 and_(
                     Post.kind == "original",
                     Post.deleted_at.is_(None),
-                    Post.text.ilike(f"%{clean_query}%"),
+                    search_filter,
                 )
             )
             .order_by(Post.created_at.desc(), Post.id.desc())
@@ -702,12 +711,27 @@ class PostgresRepository:
         result = await self._session.execute(stmt)
         rows = result.all()
 
+        post_ids = [row[0].id for row in rows]
+        liker_map = defaultdict(list)
+        if post_ids:
+            likers_stmt = (
+                select(PostLike.post_id, User.handle)
+                .join(User, PostLike.user_id == User.id)
+                .where(PostLike.post_id.in_(post_ids))
+                .order_by(PostLike.created_at.desc())
+            )
+            likers_res = await self._session.execute(likers_stmt)
+            for pid, handle in likers_res.all():
+                if len(liker_map[pid]) < 3:
+                    liker_map[pid].append(handle)
+
         return [
             self._assemble_post_dict(
                 post=row[0],
                 like_count=row[1] or 0,
                 reply_count=row[2] or 0,
                 liked_by_viewer=bool(row[3]),
+                liker_handles=liker_map.get(row[0].id, []),
             )
             for row in rows
         ]

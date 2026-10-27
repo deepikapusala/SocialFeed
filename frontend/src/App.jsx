@@ -10,6 +10,7 @@ import {
   fetchPostDetailApi,
   getStoredUser,
   logoutApi,
+  searchPostsApi,
 } from './utils/api';
 import './App.css';
 
@@ -38,8 +39,10 @@ export function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Search query state
+  // Search query & results state
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Map of followed author handles for synced UI
   const [followingMap, setFollowingMap] = useState({});
@@ -334,33 +337,36 @@ export function App() {
   };
 
   // -------------------------------------------------------------
-  // Search filter: Supports '#art', 'art', username, & category
+  // Live global search: queries backend across all 60 posts from all 5 profiles
+  // Supports '#waffles', '#cricket', '#flowers', '#music', '#books', etc.
   // -------------------------------------------------------------
-  const cleanQuery = searchQuery.trim().toLowerCase();
-  const rawTerm = cleanQuery.replace(/^#+/, ''); // Strips leading '#' if present
-  const hashtagTerm = '#' + rawTerm;             // Ensures '#art' format for tag matching
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
 
-  const filteredPosts = cleanQuery
-    ? posts.filter((post) => {
-        const caption = (post.caption || post.text || '').toLowerCase();
-        const category = (post.category || '').toLowerCase();
-        const username = (post.username || post.author?.handle || '').toLowerCase();
-        const displayName = (post.displayName || post.author?.displayName || '').toLowerCase();
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchPostsApi(trimmed, 60);
+        setSearchResults(results);
+      } catch (err) {
+        console.warn('Live search error:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 150);
 
-        // 1. Match hashtag (e.g. searching '#art' or 'art' matches '#art' in caption)
-        const matchesHashtag = caption.includes(hashtagTerm);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-        // 2. Match category (e.g. 'Art', 'Nature', 'Coffee')
-        const matchesCategory = category.includes(rawTerm);
-
-        // 3. Match username or display name (e.g. 'yosemite_wanderer', 'atelier_canvas')
-        const matchesUser = username.includes(rawTerm) || displayName.includes(rawTerm);
-
-        // 4. Match general caption words
-        const matchesCaption = caption.includes(cleanQuery) || caption.includes(rawTerm);
-
-        return matchesHashtag || matchesCategory || matchesUser || matchesCaption;
-      })
+  const isSearchActive = Boolean(searchQuery.trim());
+  const filteredPosts = isSearchActive
+    ? (searchResults !== null ? searchResults : [])
     : posts;
 
   const handleUpdatePost = useCallback((postId, updates) => {
@@ -410,11 +416,11 @@ export function App() {
           )}
 
           {/* Message when no posts match search */}
-          {cleanQuery && filteredPosts.length === 0 && !loading && (
+          {isSearchActive && filteredPosts.length === 0 && !isSearching && !loading && (
             <div className="app__empty-search">
               <p className="app__empty-title">No posts found for "{searchQuery}"</p>
               <p className="app__empty-subtitle">
-                Try searching by tag, caption keyword, or handle...
+                Try searching by tag (e.g. #waffles, #flowers, #cricket, #books, #music), caption keyword, or handle...
               </p>
               <button
                 type="button"
@@ -433,7 +439,7 @@ export function App() {
               onSelectPost={handleSelectPost}
               onToggleFollow={handleToggleFollow}
               onLoadMore={() => loadPosts(false)}
-              hasMore={cleanQuery ? false : hasMore}
+              hasMore={isSearchActive ? false : hasMore}
               loading={loading}
             />
           )}

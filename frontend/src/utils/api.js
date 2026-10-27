@@ -487,3 +487,33 @@ export async function markSingleNotificationReadApi(notificationId) {
   return await response.json();
 }
 
+/**
+ * Searches original posts across all profiles by keyword, hashtag (#), or author handle.
+ *
+ * @param {string} query - Search string (e.g. '#waffles', 'waffles', '#cricket', 'flowers').
+ * @param {number} limit - Maximum number of posts to fetch (defaults to 60).
+ * @returns {Promise<Array>} Normalized post items.
+ */
+export async function searchPostsApi(query, limit = 60) {
+  if (!query || !query.trim()) return [];
+  const cleanQ = query.trim();
+  const url = new URL(`${API_BASE_URL}/search/posts`);
+  url.searchParams.set('q', cleanQ);
+  url.searchParams.set('limit', String(limit));
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      ...getAuthHeaders(),
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  return (data.items || []).map(normalizePostItem);
+}
+
