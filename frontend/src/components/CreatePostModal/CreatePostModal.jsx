@@ -1,6 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createOriginalPostApi } from '../../utils/api';
+import { createOriginalPostApi, resolveImageUrlApi } from '../../utils/api';
 import './CreatePostModal.css';
+
+/**
+ * Curated Unsplash photo presets in standard format (?auto=format&fit=crop&w=1080&q=80).
+ */
+const UNSPLASH_PRESETS = [
+  { label: '🍝 Pasta', url: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=1080&q=80' },
+  { label: '🌸 Flora', url: 'https://images.unsplash.com/photo-1520763185298-1b434c919102?auto=format&fit=crop&w=1080&q=80' },
+  { label: '📚 Books', url: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1080&q=80' },
+  { label: '🎧 Music', url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1080&q=80' },
+  { label: '🏏 Cricket', url: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1080&q=80' },
+];
 
 /**
  * Reads and optimizes an image file from local PC disk into a clean JPEG data URL.
@@ -53,6 +64,7 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
   const [altTextInput, setAltTextInput] = useState('');
   const [inputMode, setInputMode] = useState('file'); // 'file' or 'url'
   const [loading, setLoading] = useState(false);
+  const [resolvingUrl, setResolvingUrl] = useState(false);
   const [error, setError] = useState(null);
 
   const fileInputRef = useRef(null);
@@ -68,6 +80,7 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
       setInputMode('file');
       setError(null);
       setLoading(false);
+      setResolvingUrl(false);
     }
   }, [isOpen]);
 
@@ -128,8 +141,8 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
   };
 
   // Handle Image URL input
-  const handleAddUrl = (e) => {
-    e.preventDefault();
+  const handleAddUrl = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     const cleanUrl = urlInput.trim();
     if (!cleanUrl) return;
 
@@ -138,30 +151,71 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
       return;
     }
 
-    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://') && !cleanUrl.startsWith('data:image/')) {
       setError('Please provide a valid web image URL (starting with https://).');
       return;
     }
 
-    let finalUrl = cleanUrl;
-    if (finalUrl.includes('images.unsplash.com') && !finalUrl.includes('auto=format')) {
-      const base = finalUrl.split('?')[0].split('&')[0];
-      finalUrl = `${base}?auto=format&fit=crop&w=1080&q=80`;
-    }
+    setError(null);
+    setResolvingUrl(true);
 
+    try {
+      // 1. Resolve and format to standard ?auto=format&fit=crop&w=1080&q=80
+      const finalUrl = await resolveImageUrlApi(cleanUrl);
+
+      // 2. Pre-validate image loading in memory so a broken image is NEVER added!
+      await new Promise((resolve, reject) => {
+        const testImg = new Image();
+        testImg.onload = () => {
+          resolve({
+            width: testImg.naturalWidth || 1080,
+            height: testImg.naturalHeight || 1080,
+          });
+        };
+        testImg.onerror = () => {
+          reject(new Error('Image failed to load from this URL. Please verify the URL or try one of the curated presets below.'));
+        };
+        testImg.src = finalUrl;
+      }).then(({ width, height }) => {
+        const newImg = {
+          id: `url-${Date.now()}-${images.length}`,
+          url: finalUrl,
+          width: width,
+          height: height,
+          altText: altTextInput.trim() || 'Instagram photo',
+        };
+
+        setImages((prev) => [...prev, newImg].slice(0, 3));
+        setActiveImageIndex(images.length);
+        setUrlInput('');
+        setAltTextInput('');
+        setError(null);
+      });
+    } catch (err) {
+      console.warn('Failed to load image from URL:', err);
+      setError(err.message || 'Could not load image from this URL. Please verify the URL or choose one of the photo presets below.');
+    } finally {
+      setResolvingUrl(false);
+    }
+  };
+
+  // Handle Preset selection
+  const handleAddPreset = async (presetUrl, label) => {
+    if (images.length >= 3) {
+      setError('You can add up to 3 photos per post.');
+      return;
+    }
+    setError(null);
     const newImg = {
-      id: `url-${Date.now()}`,
-      url: finalUrl,
+      id: `url-preset-${Date.now()}-${images.length}`,
+      url: presetUrl,
       width: 1080,
       height: 1080,
-      altText: altTextInput.trim() || 'Instagram photo',
+      altText: label.replace(/^[^\w\s]+/, '').trim() || 'Instagram photo',
     };
-
     setImages((prev) => [...prev, newImg].slice(0, 3));
     setActiveImageIndex(images.length);
     setUrlInput('');
-    setAltTextInput('');
-    setError(null);
   };
 
   // Remove a photo from selected list
@@ -318,6 +372,9 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
                   src={currentActiveImage.url}
                   alt={currentActiveImage.altText || 'Preview'}
                   className="create-post-preview__img"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1080&q=80';
+                  }}
                 />
 
                 {/* Carousel Pagination Dots */}
@@ -355,7 +412,13 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
                     onClick={() => setActiveImageIndex(idx)}
                     title={`Photo ${idx + 1}`}
                   >
-                    <img src={img.url} alt={`Thumbnail ${idx + 1}`} />
+                    <img
+                      src={img.url}
+                      alt={`Thumbnail ${idx + 1}`}
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=150&q=80';
+                      }}
+                    />
                     <button
                       type="button"
                       className="create-post-thumb__remove"
@@ -426,23 +489,47 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
 
             {/* URL Input Mode */}
             {inputMode === 'url' && (
-              <form className="create-post-url-form" onSubmit={handleAddUrl}>
-                <input
-                  type="url"
-                  className="create-post-url-input"
-                  placeholder="https://images.unsplash.com/photo-..."
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  disabled={images.length >= 3}
-                />
-                <button
-                  type="submit"
-                  className="create-post-url-btn"
-                  disabled={!urlInput.trim() || images.length >= 3}
-                >
-                  Add Photo
-                </button>
-              </form>
+              <div className="create-post-url-section">
+                <form className="create-post-url-form" onSubmit={handleAddUrl}>
+                  <input
+                    type="url"
+                    className="create-post-url-input"
+                    placeholder="Paste Unsplash image URL or photo link..."
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    disabled={images.length >= 3 || resolvingUrl}
+                  />
+                  <button
+                    type="submit"
+                    className="create-post-url-btn"
+                    disabled={!urlInput.trim() || images.length >= 3 || resolvingUrl}
+                  >
+                    {resolvingUrl ? 'Adding...' : 'Add Photo'}
+                  </button>
+                </form>
+
+                <div className="create-post-url-presets">
+                  <span className="create-post-url-presets-title">Quick Unsplash Presets:</span>
+                  <div className="create-post-url-presets-list">
+                    {UNSPLASH_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        className="create-post-preset-btn"
+                        onClick={() => handleAddPreset(p.url, p.label)}
+                        disabled={images.length >= 3 || resolvingUrl}
+                        title={`Add ${p.label}`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <span className="create-post-hint">
+                  Auto-formatted with <code>?auto=format&fit=crop&w=1080&q=80</code>
+                </span>
+              </div>
             )}
 
             {/* Active Image Custom Alt Text */}

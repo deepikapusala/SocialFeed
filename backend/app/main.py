@@ -43,6 +43,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     # 1. Startup: Load and validate runtime configuration
     _ = get_settings()
+
+    # Normalize existing post_media URLs to standard 1080px Unsplash format
+    try:
+        from app.database import get_async_sessionmaker
+        from sqlalchemy import text
+        sessionmaker = get_async_sessionmaker()
+        async with sessionmaker() as session:
+            await session.execute(text("""
+                UPDATE post_media
+                SET small_url = regexp_replace(small_url, '\\?.*$', '') || '?auto=format&fit=crop&w=1080&q=80',
+                    large_url = regexp_replace(large_url, '\\?.*$', '') || '?auto=format&fit=crop&w=1080&q=80'
+                WHERE (small_url LIKE '%unsplash.com%' AND small_url NOT LIKE '%w=1080&q=80%')
+                   OR (large_url LIKE '%unsplash.com%' AND large_url NOT LIKE '%w=1080&q=80%');
+            """))
+            await session.commit()
+    except Exception:
+        pass
+
     yield
     # 2. Shutdown: Resource cleanup
     from app.database import dispose_async_engine

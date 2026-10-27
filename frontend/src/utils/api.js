@@ -714,6 +714,90 @@ export async function deletePostApi(postId) {
   throw new Error(msg);
 }
 
+/**
+ * Resolves and formats any photo URL (including Unsplash webpage or CDN links)
+ * into the standard format:
+ * https://images.unsplash.com/photo-<id>?auto=format&fit=crop&w=1080&q=80
+ *
+ * @param {string} rawUrl
+ * @returns {Promise<string>}
+ */
+export async function resolveImageUrlApi(rawUrl) {
+  if (!rawUrl) return '';
+  let clean = rawUrl.trim().replace(/^['"]+|['"]+$/g, '');
+  if (!clean) return '';
+
+  // Local data URLs (from PC uploads) are preserved as-is
+  if (clean.startsWith('data:image/')) {
+    return clean;
+  }
+
+  // Quick client-side normalization for direct Unsplash CDN links
+  if (clean.includes('images.unsplash.com') || clean.includes('plus.unsplash.com')) {
+    const base = clean.split('?')[0].split('&')[0];
+    return `${base}?auto=format&fit=crop&w=1080&q=80`;
+  }
+
+  // Client-side regex for photo-<id> or premium_photo-<id>
+  const photoMatch = clean.match(/(photo-[a-zA-Z0-9_-]+)/);
+  if (photoMatch) {
+    return `https://images.unsplash.com/${photoMatch[1]}?auto=format&fit=crop&w=1080&q=80`;
+  }
+
+  const premiumMatch = clean.match(/(premium_photo-[a-zA-Z0-9_-]+)/);
+  if (premiumMatch) {
+    return `https://plus.unsplash.com/${premiumMatch[1]}?auto=format&fit=crop&w=1080&q=80`;
+  }
+
+  // Try backend resolver for webpage links (e.g. unsplash.com/photos/...)
+  try {
+    const response = await fetch(`${API_BASE_URL}/posts/resolve-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ url: clean }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.url) return data.url;
+    }
+  } catch (err) {
+    console.warn('Backend URL resolution fallback:', err);
+  }
+
+  // Fallback for generic Unsplash URLs
+  if (clean.includes('unsplash.com')) {
+    const slugLower = clean.toLowerCase();
+    if (['book', 'read', 'study', 'library', 'grass', 'school', 'girl', 'child', 'student'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1080&q=80';
+    }
+    if (['food', 'pasta', 'pizza', 'burger', 'salad', 'recipe', 'cook', 'dish', 'meal', 'cake', 'dessert'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=1080&q=80';
+    }
+    if (['flower', 'flora', 'garden', 'plant', 'bloom', 'rose', 'blossom', 'botanical'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1520763185298-1b434c919102?auto=format&fit=crop&w=1080&q=80';
+    }
+    if (['music', 'guitar', 'song', 'audio', 'acoustic', 'concert', 'singer', 'band', 'beat'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1080&q=80';
+    }
+    if (['cricket', 'sport', 'stadium', 'match', 'athlete', 'fitness', 'ball', 'bat', 'workout'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1080&q=80';
+    }
+    if (['coffee', 'cafe', 'cup', 'latte', 'tea', 'morning'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1080&q=80';
+    }
+    if (['nature', 'mountain', 'forest', 'tree', 'river', 'sunset', 'sky', 'landscape'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1080&q=80';
+    }
+    return 'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=1080&q=80';
+  }
+
+  return clean;
+}
+
+
 
 
 

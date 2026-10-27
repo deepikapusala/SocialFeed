@@ -176,3 +176,26 @@ async def delete_post(
     service = SocialService(repo)
     await service.delete_post(post_id=id, author_id=actor_id)
 
+
+from pydantic import BaseModel
+
+
+class ResolveUrlRequest(BaseModel):
+    url: str
+
+
+class ResolveUrlResponse(BaseModel):
+    url: str
+    small_url: str
+    large_url: str
+
+
+@router.post("/posts/resolve-url", response_model=ResolveUrlResponse)
+async def resolve_media_url(request: ResolveUrlRequest) -> ResolveUrlResponse:
+    """
+    Resolves any image URL or Unsplash webpage link into direct CDN URLs formatted with ?auto=format&fit=crop&w=1080&q=80.
+    """
+    s_url, l_url = await SocialService._resolve_post_media_url(request.url)
+    return ResolveUrlResponse(url=l_url, small_url=s_url, large_url=l_url)
+
+

@@ -479,6 +479,55 @@
   cursor: not-allowed;
 }
 
+.create-post-url-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.create-post-url-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.create-post-url-presets-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.create-post-url-presets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.create-post-preset-btn {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.create-post-preset-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background-color: var(--color-bg-elevated);
+  transform: translateY(-1px);
+}
+
+.create-post-preset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Alt text box */
 .create-post-alt-box {
   display: flex;
