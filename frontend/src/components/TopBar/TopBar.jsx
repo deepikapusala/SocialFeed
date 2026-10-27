@@ -16,6 +16,7 @@ export function TopBar({
   currentUser,
   onOpenAuth,
   onOpenEditProfile,
+  onOpenCreatePost,
   onLogout,
   onSelectPost,
 }) {
@@ -64,8 +65,20 @@ export function TopBar({
           )}
         </form>
 
-        {/* Middle: Auth Box (Sign In / Sign Up OR User Profile) */}
+        {/* Middle: Auth Box & + Create Post Button */}
         <div className="topbar__auth-wrapper">
+          {/* Instagram-style + Create Button */}
+          <button
+            type="button"
+            className="topbar__create-post-btn"
+            onClick={currentUser ? onOpenCreatePost : onOpenAuth}
+            title={currentUser ? 'Create a new post' : 'Sign in to create a post'}
+            aria-label="Create a new post"
+          >
+            <span className="topbar__create-post-icon">+</span>
+            <span className="topbar__create-post-text">Create</span>
+          </button>
+
           {currentUser ? (
             <div className="topbar__user-chip">
               <img

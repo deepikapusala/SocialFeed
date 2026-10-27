@@ -4,6 +4,7 @@ import { PhotoGrid } from './components/PhotoGrid/PhotoGrid';
 import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
 import { AuthModal } from './components/AuthModal/AuthModal';
 import { EditProfileModal } from './components/EditProfileModal/EditProfileModal';
+import { CreatePostModal } from './components/CreatePostModal/CreatePostModal';
 import { SuggestedProfiles } from './components/SuggestedProfiles/SuggestedProfiles';
 import {
   fetchFeedFromApi,
@@ -40,6 +41,7 @@ export function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
 
   // Search query & results state
   const [searchQuery, setSearchQuery] = useState('');
@@ -430,6 +432,12 @@ export function App() {
     setSelectedPost((prev) => (prev && prev.id === postId ? { ...prev, ...updates } : prev));
   }, []);
 
+  const handlePostCreated = useCallback((newPost) => {
+    if (!newPost) return;
+    setPosts((prev) => [newPost, ...prev]);
+    setSearchQuery('');
+  }, []);
+
   return (
     <div className="app">
       {/* Top Header Bar: Search on Left, Auth in Middle, Theme Toggle on Right */}
@@ -442,6 +450,7 @@ export function App() {
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenEditProfile={() => setIsEditProfileModalOpen(true)}
+        onOpenCreatePost={() => setIsCreatePostModalOpen(true)}
         onLogout={handleLogout}
         onSelectPost={handleSelectPost}
       />
@@ -550,6 +559,14 @@ export function App() {
         onClose={() => setIsEditProfileModalOpen(false)}
         currentUser={currentUser}
         onProfileUpdated={handleProfileUpdated}
+      />
+
+      {/* Create Post Modal */}
+      <CreatePostModal
+        isOpen={isCreatePostModalOpen}
+        onClose={() => setIsCreatePostModalOpen(false)}
+        currentUser={currentUser}
+        onPostCreated={handlePostCreated}
       />
     </div>
   );

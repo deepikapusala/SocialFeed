@@ -97,7 +97,49 @@
 .topbar__auth-wrapper {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
+
+/* Instagram-style + Create Button */
+.topbar__create-post-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background-color: var(--color-bg-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 2px 8px var(--color-shadow);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast);
+}
+
+.topbar__create-post-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 64, 129, 0.2);
+}
+
+.topbar__create-post-btn:active {
+  transform: translateY(1px);
+}
+
+.topbar__create-post-icon {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
+.topbar__create-post-text {
+  letter-spacing: 0.01em;
+}
+
 
 .topbar__signin-btn {
   display: inline-flex;

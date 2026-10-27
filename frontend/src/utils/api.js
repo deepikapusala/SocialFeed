@@ -618,6 +618,37 @@ export async function updateProfileApi(updates) {
   return data.item;
 }
 
+/**
+ * Creates a new original post via POST /posts on FastAPI backend.
+ *
+ * @param {Object} payload - { text: string, media: Array<{ smallUrl, largeUrl, altText, width, height }> }
+ * @returns {Promise<Object>} Normalized post object
+ */
+export async function createOriginalPostApi({ text, media }) {
+  const response = await fetch(`${API_BASE_URL}/posts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({
+      kind: 'original',
+      text: text.trim(),
+      media: media || [],
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = data?.error?.message || data?.detail || `Failed to create post (${response.status})`;
+    throw new Error(msg);
+  }
+
+  return normalizePostItem(data.item);
+}
+
+
 
 
 
