@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
         sa.CheckConstraint("recipient_id <> actor_id", name="notifications_no_self_notification_check"),
         sa.CheckConstraint("event_type IN ('follow', 'follow_accepted', 'like', 'reply', 'repost')", name="notifications_event_type_check"),
-        sa.UniqueConstraint("recipient_id", "actor_id", "event_type", "target_post_id", name="notifications_dedup_unique"),
+        sa.UniqueConstraint("recipient_id", "actor_id", "event_type", "target_post_id", name="notifications_dedup_unique", postgresql_nulls_not_distinct=True),
     )
 
     op.create_index(

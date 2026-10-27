@@ -1543,6 +1543,19 @@ class PostgresRepository:
         if recipient_id == actor_id:
             return
 
+        # Explicit idempotency check across all event types (handles NULL target_post_id)
+        filter_post = (Notification.target_post_id == target_post_id) if target_post_id is not None else Notification.target_post_id.is_(None)
+        existing = await self._session.execute(
+            select(Notification.id).where(
+                Notification.recipient_id == recipient_id,
+                Notification.actor_id == actor_id,
+                Notification.event_type == event_type,
+                filter_post,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            return
+
         stmt = (
             pg_insert(Notification)
             .values(

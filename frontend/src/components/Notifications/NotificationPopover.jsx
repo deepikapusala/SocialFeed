@@ -31,8 +31,17 @@ export function NotificationPopover({ currentUser, onOpenAuth, onSelectPost }) {
 
     try {
       const data = await fetchNotificationsApi(null, 20);
-      setNotifications(data.items || []);
-      setUnreadCount(data.unreadCount || 0);
+      const rawItems = data.items || [];
+      // Deduplicate items logically by actor + eventType + targetPostId
+      const seen = new Set();
+      const dedupedItems = rawItems.filter((item) => {
+        const key = `${item.actor?.id || item.actor?.handle}_${item.eventType}_${item.targetPost?.id || 'null'}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setNotifications(dedupedItems);
+      setUnreadCount(dedupedItems.filter((n) => !n.isRead).length);
     } catch (err) {
       console.warn('Failed to fetch notifications:', err);
     }

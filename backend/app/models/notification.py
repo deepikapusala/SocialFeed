@@ -67,7 +67,7 @@ class Notification(Base):
     __table_args__ = (
         CheckConstraint("recipient_id <> actor_id", name="notifications_no_self_notification_check"),
         CheckConstraint("event_type IN ('follow', 'follow_accepted', 'like', 'reply', 'repost')", name="notifications_event_type_check"),
-        UniqueConstraint("recipient_id", "actor_id", "event_type", "target_post_id", name="notifications_dedup_unique"),
+        UniqueConstraint("recipient_id", "actor_id", "event_type", "target_post_id", name="notifications_dedup_unique", postgresql_nulls_not_distinct=True),
     )
 
     # Relationships
