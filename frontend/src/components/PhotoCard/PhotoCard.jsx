@@ -22,7 +22,11 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectA
   const authorHandle = post.username || post.author?.handle || 'user';
   const storedUser = getStoredUser();
   const storedHandle = storedUser?.handle?.toLowerCase();
-  const isSelf = Boolean(storedHandle && authorHandle.toLowerCase() === storedHandle);
+  const storedId = storedUser?.id;
+  const isSelf = Boolean(
+    (storedHandle && authorHandle.toLowerCase() === storedHandle) ||
+    (storedId && authorId && String(authorId) === String(storedId))
+  );
   const isFollowing = Boolean(storedUser && (post.followedByViewer || post.author?.followedByViewer));
 
   const handleFollowClick = (e) => {
@@ -80,7 +84,7 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectA
                 />
                 <span className="photo-card__author-username">@{authorHandle}</span>
               </div>
-              {!isSelf && (
+              {!isSelf ? (
                 <button
                   type="button"
                   className={`ig-follow-btn ${isFollowing ? 'ig-follow-btn--following' : ''}`}
@@ -89,6 +93,10 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectA
                 >
                   {isFollowing ? 'Following' : 'Follow'}
                 </button>
+              ) : (
+                <span className="photo-card__owner-badge" title="Your post • Click to view or delete">
+                  You
+                </span>
               )}
             </div>
 
@@ -142,7 +150,7 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectA
                   <span className="photo-card__text-time">{post.timeAgo || 'recently'}</span>
                 </div>
               </div>
-              {!isSelf && (
+              {!isSelf ? (
                 <button
                   type="button"
                   className={`ig-follow-btn ${isFollowing ? 'ig-follow-btn--following' : ''}`}
@@ -151,6 +159,10 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectA
                 >
                   {isFollowing ? 'Following' : 'Follow'}
                 </button>
+              ) : (
+                <span className="photo-card__owner-badge" title="Your post • Click to view or delete">
+                  You
+                </span>
               )}
             </div>
             <p className="photo-card__text-body">

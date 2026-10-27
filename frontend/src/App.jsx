@@ -152,6 +152,18 @@ export function App() {
     }
   }, []);
 
+  /**
+   * Handle deleting a post permanently from the user's feed and state.
+   */
+  const handleDeletePost = useCallback((postId) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    setSearchResults((prev) => (prev ? prev.filter((p) => p.id !== postId) : null));
+    setSelectedPost(null);
+    if (window.location.pathname.startsWith('/p/')) {
+      window.history.pushState({}, '', '/');
+    }
+  }, []);
+
   // Listen for browser Back / Forward buttons (popstate event)
   useEffect(() => {
     const handlePopState = async () => {
@@ -586,6 +598,7 @@ export function App() {
           post={selectedPost}
           onClose={handleClosePost}
           onUpdatePost={handleUpdatePost}
+          onDeletePost={handleDeletePost}
           onToggleFollow={handleToggleFollow}
           currentUser={currentUser}
           onOpenAuth={() => setIsAuthModalOpen(true)}

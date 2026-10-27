@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getResponsiveSrcSet } from '../../utils/images';
-import { toggleLikeApi, toggleRepostApi, fetchRepliesApi, createReplyApi, getStoredUser } from '../../utils/api';
+import {
+  toggleLikeApi,
+  toggleRepostApi,
+  fetchRepliesApi,
+  createReplyApi,
+  getStoredUser,
+  deletePostApi,
+} from '../../utils/api';
 import './PhotoViewer.css';
 
 /**
@@ -13,6 +20,7 @@ export function PhotoViewer({
   post,
   onClose,
   onUpdatePost,
+  onDeletePost,
   onToggleFollow,
   currentUser,
   onOpenAuth,
@@ -32,7 +40,11 @@ export function PhotoViewer({
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
   const activeUser = currentUser || getStoredUser();
   const activeHandle = activeUser?.handle?.toLowerCase();
-  const isSelf = Boolean(activeHandle && authorHandle.toLowerCase() === activeHandle);
+  const activeUserId = activeUser?.id;
+  const isSelf = Boolean(
+    (activeHandle && authorHandle && authorHandle.toLowerCase() === activeHandle) ||
+    (activeUserId && authorId && String(authorId) === String(activeUserId))
+  );
   const isFollowing = Boolean(activeUser && (post.followedByViewer || post.author?.followedByViewer));
 
   const handleFollowClick = (e) => {
@@ -57,6 +69,11 @@ export function PhotoViewer({
   const [isSaved, setIsSaved] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentInput, setCommentInput] = useState('');
+
+  // Delete post modal state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const commentInputRef = useRef(null);
   const touchStartXRef = useRef(null);
@@ -344,6 +361,29 @@ export function PhotoViewer({
     }
   };
 
+  const handleDeletePost = async () => {
+    if (!isSelf) {
+      setDeleteError("You are not authorized to delete another author's post.");
+      return;
+    }
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deletePostApi(post.id);
+      setShowDeleteConfirm(false);
+      if (onDeletePost) {
+        onDeletePost(post.id);
+      }
+      if (onClose) {
+        onClose();
+      }
+    } catch (err) {
+      console.error('Failed to delete post:', err);
+      setDeleteError(err.message || 'Failed to delete post. Please try again.');
+      setIsDeleting(false);
+    }
+  };
+
   const currentImageUrl = hasMedia ? images[currentImageIndex] : null;
   const srcSet = currentImageUrl ? getResponsiveSrcSet(currentImageUrl) : '';
   const initialLikes = post.likeCount ?? post.likes ?? 0;
@@ -443,14 +483,46 @@ export function PhotoViewer({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            className="post-modal__close-btn"
-            onClick={onClose}
-            aria-label="Close post modal"
-          >
-            &times;
-          </button>
+          <div className="post-modal__header-actions">
+            {isSelf && (
+              <button
+                type="button"
+                className="post-modal__delete-btn"
+                onClick={() => {
+                  setDeleteError(null);
+                  setShowDeleteConfirm(true);
+                }}
+                title="Delete post forever"
+                aria-label="Delete this post"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+                <span>Delete</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="post-modal__close-btn"
+              onClick={onClose}
+              aria-label="Close post modal"
+            >
+              &times;
+            </button>
+          </div>
         </header>
 
         {/* Media Carousel Stage with Swipe Support (Rendered only when post has media) */}
@@ -687,6 +759,73 @@ export function PhotoViewer({
           </button>
         </form>
       </article>
+
+      {/* Instagram-style Delete Post Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div
+          className="post-delete-confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+        >
+          <div
+            className="post-delete-confirm-backdrop"
+            onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+            aria-hidden="true"
+          />
+          <div className="post-delete-confirm-dialog">
+            <div className="post-delete-confirm-content">
+              <div className="post-delete-confirm-icon" aria-hidden="true">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ed4956"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+              </div>
+              <h3 id="delete-dialog-title" className="post-delete-confirm-title">
+                Delete Post?
+              </h3>
+              <p className="post-delete-confirm-desc">
+                Are you sure you want to delete this post forever? This action cannot be undone and will permanently remove this post from your feed and profile.
+              </p>
+              {deleteError && (
+                <div className="post-delete-error" role="alert">
+                  {deleteError}
+                </div>
+              )}
+            </div>
+
+            <div className="post-delete-confirm-actions">
+              <button
+                type="button"
+                className="post-delete-confirm-btn post-delete-confirm-btn--danger"
+                onClick={handleDeletePost}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button
+                type="button"
+                className="post-delete-confirm-btn post-delete-confirm-btn--cancel"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,11 @@ Posts Router (Stage A & C).
 
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
-from app.common.dependencies import get_current_actor_id, get_repository
+from app.common.dependencies import (
+    get_current_actor_id,
+    get_repository,
+    get_required_actor_id,
+)
 from app.repositories.base import SocialRepositoryProtocol
 from app.schemas.common import PaginatedResponse
 from app.schemas.post import (
@@ -163,7 +167,7 @@ async def update_post(
 async def delete_post(
     id: str,
     repo: SocialRepositoryProtocol = Depends(get_repository),
-    actor_id: str = Depends(get_current_actor_id),
+    actor_id: str = Depends(get_required_actor_id),
 ) -> None:
     """
     Soft-deletes a post authored by the current actor.

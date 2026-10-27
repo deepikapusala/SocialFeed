@@ -477,6 +477,181 @@
   cursor: default;
 }
 
+/* Header Actions Container */
+.post-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Post Delete Button in Header (Visible strictly for post owner) */
+.post-modal__delete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background-color: rgba(237, 73, 86, 0.12);
+  color: #ed4956;
+  border: 1px solid rgba(237, 73, 86, 0.3);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.2s ease);
+}
+
+.post-modal__delete-btn:hover {
+  background-color: #ed4956;
+  color: #ffffff;
+  border-color: #ed4956;
+  box-shadow: 0 2px 8px rgba(237, 73, 86, 0.35);
+  transform: translateY(-1px);
+}
+
+.post-modal__delete-btn:active {
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   Instagram-style Delete Post Confirmation Dialog
+   ========================================================================== */
+.post-delete-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.post-delete-confirm-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.post-delete-confirm-dialog {
+  position: relative;
+  z-index: 1205;
+  width: 100%;
+  max-width: 400px;
+  background-color: var(--color-bg-surface, #262626);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+  animation: modalPopIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.post-delete-confirm-content {
+  padding: 24px 24px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.post-delete-confirm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: rgba(237, 73, 86, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.post-delete-confirm-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 8px 0;
+}
+
+.post-delete-confirm-desc {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.post-delete-error {
+  margin-top: 14px;
+  padding: 8px 12px;
+  background-color: rgba(237, 73, 86, 0.15);
+  border: 1px solid #ed4956;
+  border-radius: 8px;
+  color: #ff6b77;
+  font-size: 0.8125rem;
+  text-align: center;
+  width: 100%;
+}
+
+.post-delete-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border);
+}
+
+.post-delete-confirm-btn {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast, 0.15s ease);
+}
+
+.post-delete-confirm-btn--danger {
+  color: #ed4956;
+  font-weight: 700;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.post-delete-confirm-btn--danger:hover:not(:disabled) {
+  background-color: rgba(237, 73, 86, 0.1);
+}
+
+.post-delete-confirm-btn--cancel {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.post-delete-confirm-btn--cancel:hover:not(:disabled) {
+  background-color: var(--color-bg-elevated, rgba(255, 255, 255, 0.05));
+}
+
+.post-delete-confirm-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 640px) {
   .post-modal__card {
@@ -492,3 +667,4 @@
     max-height: 46vh;
   }
 }
+

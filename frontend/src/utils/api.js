@@ -687,6 +687,34 @@ export async function createOriginalPostApi({ text, media }) {
   return normalizePostItem(data.item);
 }
 
+/**
+ * Deletes a post authored by the current viewer via DELETE /posts/{id}.
+ * Enforces ownership: returns 403 Forbidden if not the author.
+ *
+ * @param {string} postId - UUID of post to delete
+ * @returns {Promise<boolean>} True if deleted successfully
+ */
+export async function deletePostApi(postId) {
+  if (!postId) return false;
+
+  const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+    method: 'DELETE',
+    headers: {
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
+
+  if (response.status === 204 || response.ok) {
+    return true;
+  }
+
+  const data = await response.json().catch(() => ({}));
+  const msg = data?.error?.message || data?.detail || `Failed to delete post (${response.status})`;
+  throw new Error(msg);
+}
+
+
 
 
 
