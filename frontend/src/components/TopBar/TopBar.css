@@ -173,12 +173,23 @@
   color: var(--color-text-primary);
 }
 
-.topbar__user-badge {
+.topbar__edit-profile-btn {
+  background: none;
+  border: none;
+  padding: 0;
   font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-accent);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-align: left;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.topbar__edit-profile-btn:hover {
+  opacity: 0.8;
+  text-decoration: underline;
 }
 
 .topbar__logout-btn {

@@ -554,4 +554,70 @@ export async function searchPostsApi(query, limit = 60) {
   }
 }
 
+/**
+ * Fetches all registered users from GET /users endpoint.
+ *
+ * @returns {Promise<{ items: Array }>}
+ */
+export async function fetchUsersApi() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        ...getAuthHeaders(),
+      },
+    });
+
+    if (!response.ok) {
+      return { items: [] };
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.warn('Failed to fetch users:', err);
+    return { items: [] };
+  }
+}
+
+/**
+ * Updates the authenticated user's profile (displayName, handle, bio) via PATCH /users/me.
+ *
+ * @param {Object} updates - { displayName, handle, bio }
+ * @returns {Promise<Object>} Updated UserProfile
+ */
+export async function updateProfileApi(updates) {
+  const response = await fetch(`${API_BASE_URL}/users/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(updates),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = data?.error?.message || data?.detail || `Failed to update profile (${response.status})`;
+    throw new Error(msg);
+  }
+
+  // Update locally stored user data to reflect changes
+  const storedUser = getStoredUser();
+  if (storedUser && data.item) {
+    const updatedUser = {
+      ...storedUser,
+      displayName: data.item.displayName,
+      handle: data.item.handle,
+      bio: data.item.bio,
+    };
+    localStorage.setItem('insta_demo_user', JSON.stringify(updatedUser));
+  }
+
+  return data.item;
+}
+
+
+
 

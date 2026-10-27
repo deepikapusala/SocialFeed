@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchUsersApi } from '../../utils/api';
 import './SuggestedProfiles.css';
 
 /**
- * Metadata for all 5 core profiles in the application.
+ * Metadata for the 5 core curated profiles in the application.
  */
 export const ALL_PROFILES = [
   {
@@ -54,9 +55,8 @@ export const ALL_PROFILES = [
 
 /**
  * SuggestedProfiles sidebar component.
- * Displays "Explore More Profiles" with profile cards, handles, DP, and Follow button.
- * - In default (logged out) state: displays all 5 profiles. Clicking Follow opens Sign In.
- * - In authenticated state: displays the other 4 profiles (excluding the logged in user).
+ * Displays "Explore More Profiles" with core creators and newly registered community accounts.
+ * Shows a "More" button to toggle and view newly registered accounts (e.g. @vivek).
  */
 export function SuggestedProfiles({
   currentUser,
@@ -65,17 +65,49 @@ export function SuggestedProfiles({
   followingMap = {},
   onSelectProfile,
 }) {
+  const [communityUsers, setCommunityUsers] = useState([]);
+  const [showMore, setShowMore] = useState(false);
+
   const currentHandle = currentUser?.handle?.toLowerCase();
 
-  // Filter profiles: show all 5 when logged out, or exclude self when logged in
-  const visibleProfiles = ALL_PROFILES.filter(
+  // Fetch registered users from PostgreSQL to discover community accounts (like @vivek)
+  useEffect(() => {
+    fetchUsersApi()
+      .then((res) => {
+        if (res?.items?.length > 0) {
+          const coreHandles = new Set(ALL_PROFILES.map((p) => p.handle.toLowerCase()));
+          const community = res.items
+            .filter((u) => !coreHandles.has(u.handle.toLowerCase()))
+            .map((u) => ({
+              id: u.id,
+              handle: u.handle,
+              displayName: u.displayName || u.handle,
+              bio: u.bio || 'New Community Creator',
+              badge: 'Community 🌟',
+              avatar: u.avatar || null,
+            }));
+          setCommunityUsers(community);
+        }
+      })
+      .catch(() => {});
+  }, [currentUser]);
+
+  // Filter core profiles: exclude current user if logged in
+  const visibleCoreProfiles = ALL_PROFILES.filter(
     (p) => !currentHandle || p.handle.toLowerCase() !== currentHandle
   );
 
+  // Filter community profiles: exclude current user if logged in
+  const visibleCommunityProfiles = communityUsers.filter(
+    (p) => !currentHandle || p.handle.toLowerCase() !== currentHandle
+  );
+
+  const totalVisibleCount =
+    visibleCoreProfiles.length + (showMore ? visibleCommunityProfiles.length : 0);
+
   const handleFollowClick = (profile) => {
     if (!currentUser) {
-      // Logged out on default page -> prompt user to sign in
-      onOpenAuth();
+      if (onOpenAuth) onOpenAuth();
       return;
     }
 
@@ -89,23 +121,41 @@ export function SuggestedProfiles({
     }
   };
 
+  const currentUserAvatar =
+    currentUser?.avatar?.smallUrl ||
+    currentUser?.avatar?.largeUrl ||
+    currentUser?.avatarUrl ||
+    currentUser?.avatar ||
+    null;
+
   return (
     <aside className="suggested-sidebar" aria-label="Explore More Profiles">
       {/* Current User Quick Header Card (when logged in) */}
       {currentUser && (
         <div className="suggested-sidebar__my-card">
-          <img
-            src={
-              currentUser.avatar?.smallUrl ||
-              currentUser.avatar?.largeUrl ||
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
-            }
-            alt={currentUser.handle}
-            className="suggested-sidebar__my-avatar"
-            onClick={() => onSelectProfile && onSelectProfile(currentUser.handle)}
-            style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
-            title={`View posts by @${currentUser.handle}`}
-          />
+          <div className="suggested-sidebar__my-avatar-wrapper">
+            {currentUserAvatar ? (
+              <img
+                src={currentUserAvatar}
+                alt={currentUser.handle}
+                className="suggested-sidebar__my-avatar"
+                onClick={() => onSelectProfile && onSelectProfile(currentUser.handle)}
+                style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
+                title={`View posts by @${currentUser.handle}`}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div
+              className="suggested-sidebar__my-avatar-fallback"
+              style={{ display: currentUserAvatar ? 'none' : 'flex' }}
+            >
+              {(currentUser.displayName || currentUser.handle || 'U').charAt(0).toUpperCase()}
+            </div>
+          </div>
+
           <div
             className="suggested-sidebar__my-info"
             onClick={() => onSelectProfile && onSelectProfile(currentUser.handle)}
@@ -137,7 +187,7 @@ export function SuggestedProfiles({
           <h2 className="suggested-sidebar__title">Explore More Profiles</h2>
         </div>
         <span className="suggested-sidebar__count">
-          {visibleProfiles.length} {visibleProfiles.length === 1 ? 'profile' : 'profiles'}
+          {totalVisibleCount} {totalVisibleCount === 1 ? 'profile' : 'profiles'}
         </span>
       </div>
 
@@ -147,9 +197,10 @@ export function SuggestedProfiles({
           : 'Sign in to follow creators and personalize your feed'}
       </p>
 
-      {/* Profiles List / 5 Boxes */}
+      {/* Profiles List */}
       <div className="suggested-sidebar__list" role="list">
-        {visibleProfiles.map((p) => {
+        {/* 1. Core Curated Creators */}
+        {visibleCoreProfiles.map((p) => {
           const isFollowing = currentUser
             ? Boolean(followingMap[p.handle.toLowerCase()])
             : false;
@@ -162,12 +213,24 @@ export function SuggestedProfiles({
                 style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
                 title={`View posts by @${p.handle}`}
               >
-                <img
-                  src={p.avatar}
-                  alt={`${p.displayName} (@${p.handle})`}
-                  className="suggested-profile-card__avatar"
-                  loading="lazy"
-                />
+                {p.avatar ? (
+                  <img
+                    src={p.avatar}
+                    alt={`${p.displayName} (@${p.handle})`}
+                    className="suggested-profile-card__avatar"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="suggested-profile-card__avatar-fallback"
+                  style={{ display: p.avatar ? 'none' : 'flex' }}
+                >
+                  {(p.displayName || p.handle || 'U').charAt(0).toUpperCase()}
+                </div>
               </div>
 
               <div
@@ -202,7 +265,98 @@ export function SuggestedProfiles({
             </div>
           );
         })}
+
+        {/* 2. Newly Registered Community Accounts (Expanded when showMore is true) */}
+        {showMore &&
+          visibleCommunityProfiles.map((p) => {
+            const isFollowing = currentUser
+              ? Boolean(followingMap[p.handle.toLowerCase()])
+              : false;
+
+            return (
+              <div
+                key={p.handle}
+                className="suggested-profile-card suggested-profile-card--community"
+                role="listitem"
+              >
+                <div
+                  className="suggested-profile-card__avatar-wrapper"
+                  onClick={() => onSelectProfile && onSelectProfile(p.handle)}
+                  style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
+                  title={`View posts by @${p.handle}`}
+                >
+                  {p.avatar ? (
+                    <img
+                      src={p.avatar}
+                      alt={`${p.displayName} (@${p.handle})`}
+                      className="suggested-profile-card__avatar"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className="suggested-profile-card__avatar-fallback"
+                    style={{ display: p.avatar ? 'none' : 'flex' }}
+                  >
+                    {(p.displayName || p.handle || 'U').charAt(0).toUpperCase()}
+                  </div>
+                </div>
+
+                <div
+                  className="suggested-profile-card__content"
+                  onClick={() => onSelectProfile && onSelectProfile(p.handle)}
+                  style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
+                  title={`View posts by @${p.handle}`}
+                >
+                  <div className="suggested-profile-card__names">
+                    <span className="suggested-profile-card__name">{p.displayName}</span>
+                    <span className="suggested-profile-card__handle">@{p.handle}</span>
+                  </div>
+                  <div className="suggested-profile-card__badge">{p.badge}</div>
+                </div>
+
+                <button
+                  type="button"
+                  className={`suggested-profile-card__follow-btn ${
+                    isFollowing ? 'suggested-profile-card__follow-btn--following' : ''
+                  }`}
+                  onClick={() => handleFollowClick(p)}
+                  title={
+                    !currentUser
+                      ? 'Sign in to follow @' + p.handle
+                      : isFollowing
+                      ? 'Unfollow @' + p.handle
+                      : 'Follow @' + p.handle
+                  }
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+              </div>
+            );
+          })}
       </div>
+
+      {/* "More" Toggle Button for Newly Created Community Accounts */}
+      {visibleCommunityProfiles.length > 0 && (
+        <div className="suggested-sidebar__more-container">
+          <button
+            type="button"
+            className="suggested-sidebar__more-btn"
+            onClick={() => setShowMore((prev) => !prev)}
+            aria-expanded={showMore}
+            title={showMore ? 'Show fewer profiles' : 'Show newly registered profiles'}
+          >
+            <span>
+              {showMore
+                ? '▲ Show Less'
+                : `▼ More Profiles (${visibleCommunityProfiles.length})`}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Footer hint */}
       {!currentUser && (
@@ -216,3 +370,4 @@ export function SuggestedProfiles({
     </aside>
   );
 }
+

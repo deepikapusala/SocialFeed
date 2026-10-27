@@ -23,7 +23,55 @@ from app.schemas.user import (
 )
 from app.services.social_service import SocialService
 
+import uuid
+from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_async_session
+from app.models.follow import Follow
+
 router = APIRouter(tags=["users"])
+
+
+@router.get("/users")
+async def list_all_users(
+    session: AsyncSession = Depends(get_async_session),
+    viewer_id: Optional[str] = Depends(get_current_actor_id),
+):
+    """
+    List all registered active accounts in the application.
+    """
+    stmt = select(User).where(User.is_active == True).order_by(User.created_at.asc())
+    res = await session.execute(stmt)
+    users = res.scalars().all()
+
+    following_ids = set()
+    if viewer_id:
+        try:
+            viewer_uuid = uuid.UUID(viewer_id)
+            f_res = await session.execute(
+                select(Follow.following_id).where(
+                    and_(Follow.follower_id == viewer_uuid, Follow.status == "accepted")
+                )
+            )
+            following_ids = set(f_res.scalars().all())
+        except Exception:
+            pass
+
+    return {
+        "items": [
+            {
+                "id": str(u.id),
+                "handle": u.handle,
+                "displayName": u.display_name,
+                "bio": u.bio or "",
+                "avatar": u.avatar_small_url or u.avatar_large_url or None,
+                "followedByViewer": u.id in following_ids,
+                "isCore": u.handle in ("deepu", "sneha", "asha", "ani", "virat"),
+            }
+            for u in users
+        ]
+    }
+
 
 
 @router.get("/users/{id}", response_model=UserProfileResponse)

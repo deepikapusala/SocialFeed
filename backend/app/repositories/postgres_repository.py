@@ -1496,6 +1496,14 @@ class PostgresRepository:
 
         if "display_name" in fields and fields["display_name"] is not None:
             user.display_name = fields["display_name"]
+        if "handle" in fields and fields["handle"] is not None:
+            clean_handle = fields["handle"].strip().lower()
+            existing = await self._session.execute(
+                select(User.id).where(and_(func.lower(User.handle) == clean_handle, User.id != user_uuid))
+            )
+            if existing.scalar_one_or_none() is not None:
+                raise ConflictError("Handle is already in use by another user", [{"field": "handle", "reason": "duplicate"}])
+            user.handle = clean_handle
         if "bio" in fields:
             user.bio = fields["bio"]
         if "avatar_small_url" in fields:

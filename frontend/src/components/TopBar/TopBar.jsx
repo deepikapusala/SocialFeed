@@ -15,6 +15,7 @@ export function TopBar({
   onToggleTheme,
   currentUser,
   onOpenAuth,
+  onOpenEditProfile,
   onLogout,
   onSelectPost,
 }) {
@@ -78,7 +79,14 @@ export function TopBar({
               />
               <div className="topbar__user-meta">
                 <span className="topbar__user-handle">@{currentUser.handle}</span>
-                <span className="topbar__user-badge">Following feed</span>
+                <button
+                  type="button"
+                  className="topbar__edit-profile-btn"
+                  onClick={onOpenEditProfile}
+                  title="Edit your display name, handle & bio"
+                >
+                  Edit Profile
+                </button>
               </div>
               <button
                 type="button"

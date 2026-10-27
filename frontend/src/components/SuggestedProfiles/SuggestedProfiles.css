@@ -226,6 +226,79 @@
   color: #ff4444;
 }
 
+/* Avatar Fallback Badges for accounts with null avatar */
+.suggested-profile-card__avatar-fallback {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border: 1.5px solid var(--color-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.suggested-sidebar__my-avatar-fallback {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #ec4899 0%, #f43f5e 50%, #f97316 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* Community Registered Accounts subtle border accent */
+.suggested-profile-card--community {
+  border-left: 3px solid #8b5cf6;
+  background-color: var(--color-bg-elevated);
+}
+
+/* "More" Toggle Button Container */
+.suggested-sidebar__more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+
+.suggested-sidebar__more-btn {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 1px 3px var(--color-shadow);
+}
+
+.suggested-sidebar__more-btn:hover {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px var(--color-shadow);
+}
+
 /* Footer Hint Box */
 .suggested-sidebar__hint-box {
   display: flex;

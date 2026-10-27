@@ -9,16 +9,29 @@ from app.schemas.common import CamelModel
 
 class ProfileUpdateRequest(CamelModel):
     """
-    Allowlist for updating own profile (Stage 2 PY-P0-02).
-    Strictly forbids immutable fields (id, handle, timestamps, counts, credentials).
+    Allowlist for updating own profile.
     """
     model_config = ConfigDict(extra="forbid")
 
     display_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    handle: Optional[str] = Field(None, min_length=1, max_length=30)
     bio: Optional[str] = Field(None, max_length=500)
     avatar_small_url: Optional[str] = Field(None, max_length=1000)
     avatar_large_url: Optional[str] = Field(None, max_length=1000)
     is_private: Optional[bool] = Field(None)
+
+    @field_validator("handle")
+    @classmethod
+    def validate_handle(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            clean = v.strip().lower()
+            if not clean:
+                raise ValueError("Handle cannot be empty")
+            import re
+            if not re.match(r"^[a-z0-9_]+$", clean):
+                raise ValueError("Handle must contain only lowercase alphanumeric characters and underscores")
+            return clean
+        return None
 
     @field_validator("display_name")
     @classmethod

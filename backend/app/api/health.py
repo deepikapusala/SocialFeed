@@ -10,6 +10,7 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health", response_model=HealthResponse)
+@router.get("/healthz", response_model=HealthResponse)
 @router.get("/health/live", response_model=HealthResponse)
 async def get_health_live() -> HealthResponse:
     """
@@ -20,6 +21,7 @@ async def get_health_live() -> HealthResponse:
 
 
 @router.get("/health/ready", response_model=HealthResponse)
+@router.get("/readyz", response_model=HealthResponse)
 async def get_health_ready(response: Response) -> HealthResponse:
     """
     Readiness probe performing bounded database connectivity check against instagram_modeling.

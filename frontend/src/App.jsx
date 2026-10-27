@@ -3,6 +3,7 @@ import { TopBar } from './components/TopBar/TopBar';
 import { PhotoGrid } from './components/PhotoGrid/PhotoGrid';
 import { PhotoViewer } from './components/PhotoViewer/PhotoViewer';
 import { AuthModal } from './components/AuthModal/AuthModal';
+import { EditProfileModal } from './components/EditProfileModal/EditProfileModal';
 import { SuggestedProfiles } from './components/SuggestedProfiles/SuggestedProfiles';
 import {
   fetchFeedFromApi,
@@ -38,6 +39,7 @@ export function App() {
   // Authentication state
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
 
   // Search query & results state
   const [searchQuery, setSearchQuery] = useState('');
@@ -391,6 +393,36 @@ export function App() {
     ? (searchResults !== null ? searchResults : [])
     : posts;
 
+  const handleProfileUpdated = useCallback((updatedUser) => {
+    setCurrentUser((prev) => ({
+      ...prev,
+      ...updatedUser,
+    }));
+
+    // Update feed posts authored by this user
+    setPosts((prev) =>
+      prev.map((p) => {
+        const authorId = p.authorId || p.author?.id;
+        if (authorId === updatedUser.id) {
+          return {
+            ...p,
+            username: updatedUser.handle,
+            displayName: updatedUser.displayName,
+            author: p.author
+              ? {
+                  ...p.author,
+                  handle: updatedUser.handle,
+                  displayName: updatedUser.displayName,
+                  bio: updatedUser.bio,
+                }
+              : p.author,
+          };
+        }
+        return p;
+      })
+    );
+  }, []);
+
   const handleUpdatePost = useCallback((postId, updates) => {
     setPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, ...updates } : p))
@@ -409,6 +441,7 @@ export function App() {
         onToggleTheme={handleToggleTheme}
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenEditProfile={() => setIsEditProfileModalOpen(true)}
         onLogout={handleLogout}
         onSelectPost={handleSelectPost}
       />
@@ -509,6 +542,14 @@ export function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+      />
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={isEditProfileModalOpen}
+        onClose={() => setIsEditProfileModalOpen(false)}
+        currentUser={currentUser}
+        onProfileUpdated={handleProfileUpdated}
       />
     </div>
   );

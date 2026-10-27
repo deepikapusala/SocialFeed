@@ -91,6 +91,8 @@ class SocialService:
         fields: Dict[str, Any] = {}
         if req.display_name is not None:
             fields["display_name"] = req.display_name
+        if req.handle is not None:
+            fields["handle"] = req.handle
         if req.bio is not None:
             fields["bio"] = req.bio
         if req.avatar_small_url is not None:
