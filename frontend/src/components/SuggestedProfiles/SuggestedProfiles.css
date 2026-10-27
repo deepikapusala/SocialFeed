@@ -226,6 +226,16 @@
   color: #ff4444;
 }
 
+/* Deactivated State */
+.suggested-profile-card__follow-btn--deactivated {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #f59e0b !important;
+  cursor: not-allowed !important;
+  opacity: 0.85;
+}
+
+
 /* Avatar Fallback Badges for accounts with null avatar */
 .suggested-profile-card__avatar-fallback {
   width: 42px;

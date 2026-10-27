@@ -83,6 +83,14 @@ class UserAuthor(CamelModel):
     followed_by_viewer: bool = False
 
 
+class AccountActionRequest(CamelModel):
+    """
+    Payload for sensitive account actions requiring password confirmation (deactivate, delete).
+    """
+    model_config = ConfigDict(extra="forbid")
+    password: Optional[str] = Field(None, min_length=1, max_length=128)
+
+
 class UserProfile(CamelModel):
     """
     Detailed profile information for GET /users/{id}.
@@ -97,6 +105,7 @@ class UserProfile(CamelModel):
     following_count: int = 0
     followed_by_viewer: bool = False
     is_private: bool = False
+    is_deactivated: bool = False
     relationship_status: str = "none"  # 'none', 'pending', 'accepted'
 
 

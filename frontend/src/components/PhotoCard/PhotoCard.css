@@ -73,6 +73,23 @@
   flex-shrink: 0;
 }
 
+.photo-card__author-avatar-fallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ec4899 0%, #f43f5e 50%, #f97316 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1.5px solid #0095f6;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+
 .photo-card__author-username {
   font-weight: 600;
   font-size: 0.8125rem;

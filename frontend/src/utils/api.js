@@ -797,6 +797,61 @@ export async function resolveImageUrlApi(rawUrl) {
   return clean;
 }
 
+/**
+ * Temporarily deactivates the caller's account via POST /users/me/deactivate.
+ * Requires caller's password for verification.
+ * Reversible anytime by simply logging back in with handle and password.
+ *
+ * @param {string} password - User's current account password
+ * @returns {Promise<Object>}
+ */
+export async function deactivateAccountApi(password) {
+  const response = await fetch(`${API_BASE_URL}/users/me/deactivate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ password: password || '' }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = data?.error?.message || data?.detail || `Failed to deactivate account (${response.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+/**
+ * Permanently deletes the caller's account and all associated posts, likes, follows, and sessions.
+ * Requires caller's password for verification.
+ * Cannot be undone.
+ *
+ * @param {string} password - User's current account password
+ * @returns {Promise<Object>}
+ */
+export async function deleteAccountPermanentlyApi(password) {
+  const response = await fetch(`${API_BASE_URL}/users/me/delete-permanently`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ password: password || '' }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg = data?.error?.message || data?.detail || `Failed to permanently delete account (${response.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+
 
 
 

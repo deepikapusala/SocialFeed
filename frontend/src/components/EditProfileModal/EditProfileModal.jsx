@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { updateProfileApi } from '../../utils/api';
+import { updateProfileApi, deactivateAccountApi, deleteAccountPermanentlyApi } from '../../utils/api';
 import './EditProfileModal.css';
 
 /**
@@ -15,10 +15,10 @@ const SAMPLE_AVATARS = [
 
 /**
  * EditProfileModal component.
- * Allows authenticated users to edit their Display Name, Username/Handle, Bio, and Avatar (via Unsplash / Web URL).
- * Persists updates to PostgreSQL users table via PATCH /users/me.
+ * Allows authenticated users to edit their Display Name, Username/Handle, Bio, and Avatar (via Unsplash / Web URL),
+ * or choose Account Deletion (Temporary Deletion / Deactivation vs Permanent Deletion).
  */
-export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdated }) {
+export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdated, onAccountDeactivated }) {
   const [displayName, setDisplayName] = useState('');
   const [handle, setHandle] = useState('');
   const [bio, setBio] = useState('');
@@ -26,6 +26,13 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
   const [imageLoadError, setImageLoadError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Account Deletion Submodal State
+  const [showDeletionModal, setShowDeletionModal] = useState(false);
+  const [deletionType, setDeletionType] = useState('temporary'); // 'temporary' | 'permanent'
+  const [deletionPassword, setDeletionPassword] = useState('');
+  const [deletionLoading, setDeletionLoading] = useState(false);
+  const [deletionError, setDeletionError] = useState(null);
 
   // Sync state whenever modal opens or currentUser changes
   useEffect(() => {
@@ -44,6 +51,9 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
       setAvatarUrl(existingAvatar);
       setImageLoadError(false);
       setError(null);
+      setShowDeletionModal(false);
+      setDeletionPassword('');
+      setDeletionError(null);
     }
   }, [currentUser, isOpen]);
 
@@ -98,6 +108,39 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
       setError(err.message || 'Failed to update profile. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAccountDeletion = async (e) => {
+    e.preventDefault();
+    setDeletionError(null);
+
+    const cleanPass = deletionPassword.trim();
+    if (!cleanPass) {
+      setDeletionError('Please enter your account password to confirm.');
+      return;
+    }
+
+    setDeletionLoading(true);
+
+    try {
+      if (deletionType === 'temporary') {
+        await deactivateAccountApi(cleanPass);
+        if (onAccountDeactivated) {
+          onAccountDeactivated({ type: 'temporary', handle: currentUser.handle });
+        }
+      } else {
+        await deleteAccountPermanentlyApi(cleanPass);
+        if (onAccountDeactivated) {
+          onAccountDeactivated({ type: 'permanent', handle: currentUser.handle });
+        }
+      }
+      setShowDeletionModal(false);
+      onClose();
+    } catch (err) {
+      setDeletionError(err.message || 'Incorrect password. Please verify and try again.');
+    } finally {
+      setDeletionLoading(false);
     }
   };
 
@@ -276,6 +319,27 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
             <span className="edit-profile-counter">{bio.length} / 500</span>
           </div>
 
+          {/* Danger Zone: Account Deletion */}
+          <div className="edit-profile-danger-zone">
+            <div className="edit-profile-danger-zone__info">
+              <span className="edit-profile-danger-zone__title">Account Deletion</span>
+              <span className="edit-profile-danger-zone__subtitle">
+                Deactivate temporarily or delete account permanently
+              </span>
+            </div>
+            <button
+              type="button"
+              className="edit-profile-danger-zone__btn"
+              onClick={() => {
+                setShowDeletionModal(true);
+                setDeletionError(null);
+                setDeletionPassword('');
+              }}
+            >
+              Account Deletion
+            </button>
+          </div>
+
           {/* Actions */}
           <div className="edit-profile-modal__actions">
             <button
@@ -295,6 +359,145 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
             </button>
           </div>
         </form>
+
+        {/* Account Deletion Sub-Modal */}
+        {showDeletionModal && (
+          <div className="edit-profile-deletion-modal-overlay" role="dialog" aria-modal="true">
+            <div className="edit-profile-deletion-modal">
+              <button
+                type="button"
+                className="edit-profile-modal__close-btn"
+                onClick={() => setShowDeletionModal(false)}
+                aria-label="Close deletion modal"
+              >
+                &times;
+              </button>
+
+              <div className="edit-profile-deletion-modal__header">
+                <span className="edit-profile-deletion-modal__icon">⚠️</span>
+                <h3 className="edit-profile-deletion-modal__title">Account Deletion</h3>
+                <p className="edit-profile-deletion-modal__subtitle">
+                  Choose how you want to remove account <strong>@{currentUser.handle}</strong>
+                </p>
+              </div>
+
+              {deletionError && (
+                <div className="edit-profile-modal__error-box" role="alert">
+                  <span className="edit-profile-modal__error-icon">⚠️</span>
+                  <span>{deletionError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleAccountDeletion} className="edit-profile-deletion-modal__form">
+                {/* Option 1: Temporary Deletion (Deactivate) */}
+                <label
+                  className={`edit-profile-deletion-option ${
+                    deletionType === 'temporary' ? 'edit-profile-deletion-option--selected' : ''
+                  }`}
+                  onClick={() => setDeletionType('temporary')}
+                >
+                  <input
+                    type="radio"
+                    name="deletionType"
+                    value="temporary"
+                    checked={deletionType === 'temporary'}
+                    onChange={() => setDeletionType('temporary')}
+                    className="edit-profile-deletion-radio"
+                  />
+                  <div className="edit-profile-deletion-option__content">
+                    <div className="edit-profile-deletion-option__heading">
+                      <span className="edit-profile-deletion-option__name">
+                        Temporary Deletion (Deactivate)
+                      </span>
+                      <span className="edit-profile-deletion-badge edit-profile-deletion-badge--temporary">
+                        Reversible
+                      </span>
+                    </div>
+                    <p className="edit-profile-deletion-option__desc">
+                      Deactivating your account is temporary. Your profile and posts will be hidden. Anyone who visits your profile will see: <em>&quot;This account has been temporarily deleted (deactivated)&quot;</em>. You can reactivate anytime simply by signing back in with your username and password!
+                    </p>
+                  </div>
+                </label>
+
+                {/* Option 2: Permanent Deletion */}
+                <label
+                  className={`edit-profile-deletion-option edit-profile-deletion-option--danger ${
+                    deletionType === 'permanent' ? 'edit-profile-deletion-option--selected-danger' : ''
+                  }`}
+                  onClick={() => setDeletionType('permanent')}
+                >
+                  <input
+                    type="radio"
+                    name="deletionType"
+                    value="permanent"
+                    checked={deletionType === 'permanent'}
+                    onChange={() => setDeletionType('permanent')}
+                    className="edit-profile-deletion-radio"
+                  />
+                  <div className="edit-profile-deletion-option__content">
+                    <div className="edit-profile-deletion-option__heading">
+                      <span className="edit-profile-deletion-option__name">
+                        Permanent Deletion (Delete Forever)
+                      </span>
+                      <span className="edit-profile-deletion-badge edit-profile-deletion-badge--permanent">
+                        Cannot be undone
+                      </span>
+                    </div>
+                    <p className="edit-profile-deletion-option__desc">
+                      Permanently deletes your account, profile, all posts, media, likes, comments, and followers. This action is <strong>irreversible and cannot be undone</strong>. You will never be able to log in or recover this account again.
+                    </p>
+                  </div>
+                </label>
+
+                {/* Password confirmation */}
+                <div className="edit-profile-field edit-profile-field--deletion-password">
+                  <label htmlFor="deletion-password" className="edit-profile-label">
+                    Enter Password to Confirm {deletionType === 'temporary' ? 'Deactivation' : 'Permanent Deletion'}:
+                  </label>
+                  <input
+                    id="deletion-password"
+                    type="password"
+                    className="edit-profile-input"
+                    value={deletionPassword}
+                    onChange={(e) => setDeletionPassword(e.target.value)}
+                    placeholder="Enter account password"
+                    required
+                  />
+                  <span className="edit-profile-hint">
+                    Required for authorization. (Default test password is <code>TestPassword123!</code> for seed accounts)
+                  </span>
+                </div>
+
+                {/* Actions */}
+                <div className="edit-profile-deletion-modal__actions">
+                  <button
+                    type="button"
+                    className="edit-profile-btn edit-profile-btn--cancel"
+                    onClick={() => setShowDeletionModal(false)}
+                    disabled={deletionLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={`edit-profile-btn ${
+                      deletionType === 'temporary'
+                        ? 'edit-profile-btn--deactivate'
+                        : 'edit-profile-btn--delete-permanent'
+                    }`}
+                    disabled={deletionLoading || !deletionPassword.trim()}
+                  >
+                    {deletionLoading
+                      ? 'Processing...'
+                      : deletionType === 'temporary'
+                      ? 'Deactivate Account'
+                      : 'Permanently Delete Account'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

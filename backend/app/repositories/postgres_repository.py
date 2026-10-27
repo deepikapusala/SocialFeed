@@ -394,8 +394,12 @@ class PostgresRepository:
         if not row:
             return None
 
-        post, like_cnt, reply_cnt, liked, followed, repost_cnt, reposted = (
-            row[0], row[1] or 0, row[2] or 0, bool(row[3]), bool(row[4]), row[5] or 0, bool(row[6])
+        post = row[0]
+        if not post.author or not post.author.is_active:
+            return None
+
+        like_cnt, reply_cnt, liked, followed, repost_cnt, reposted = (
+            row[1] or 0, row[2] or 0, bool(row[3]), bool(row[4]), row[5] or 0, bool(row[6])
         )
         ref_handle, ref_text = None, None
 
@@ -506,7 +510,7 @@ class PostgresRepository:
             following_count_sq.label("following_count"),
             followed_by_viewer_sq.label("followed_by_viewer"),
             relationship_status_sq.label("relationship_status"),
-        ).where(and_(User.id == user_uuid, User.is_active.is_(True)))
+        ).where(User.id == user_uuid)
 
         result = await self._session.execute(stmt)
         row = result.first()
@@ -527,14 +531,15 @@ class PostgresRepository:
             "id": str(user.id),
             "handle": user.handle,
             "displayName": user.display_name,
-            "bio": user.bio,
+            "bio": user.bio if user.is_active else "This account has been temporarily deleted (deactivated).",
             "avatar": avatar,
-            "postCount": post_cnt,
-            "followerCount": follower_cnt,
-            "followingCount": following_cnt,
-            "followedByViewer": followed_by_viewer,
+            "postCount": post_cnt if user.is_active else 0,
+            "followerCount": follower_cnt if user.is_active else 0,
+            "followingCount": following_cnt if user.is_active else 0,
+            "followedByViewer": followed_by_viewer if user.is_active else False,
             "isPrivate": user.is_private,
-            "relationshipStatus": rel_status,
+            "isDeactivated": not user.is_active,
+            "relationshipStatus": rel_status if user.is_active else "none",
         }
 
     async def list_direct_replies(
@@ -740,6 +745,7 @@ class PostgresRepository:
                 and_(
                     Post.kind == "original",
                     Post.deleted_at.is_(None),
+                    User.is_active.is_(True),
                     search_filter,
                 )
             )

@@ -64,6 +64,7 @@ export function SuggestedProfiles({
   onToggleFollow,
   followingMap = {},
   onSelectProfile,
+  refreshKey = 0,
 }) {
   const [coreProfiles, setCoreProfiles] = useState(ALL_PROFILES);
   const [communityUsers, setCommunityUsers] = useState([]);
@@ -81,44 +82,52 @@ export function SuggestedProfiles({
             itemsMap.set(u.handle.toLowerCase(), u);
           });
 
-          // Sync core profiles with live database data (avatar, displayName, bio)
+          // Sync core profiles with live database data (avatar, displayName, bio, isDeactivated)
           setCoreProfiles((prev) =>
-            prev.map((core) => {
-              const live = itemsMap.get(core.handle.toLowerCase());
-              if (!live) return core;
-              return {
-                ...core,
-                displayName: live.displayName || core.displayName,
-                bio: live.bio !== undefined && live.bio !== null && live.bio !== '' ? live.bio : core.bio,
-                avatar:
-                  live.avatar?.smallUrl ||
-                  live.avatar?.largeUrl ||
-                  live.avatarUrl ||
-                  (typeof live.avatar === 'string' ? live.avatar : core.avatar),
-              };
-            })
+            prev
+              .filter((core) => itemsMap.has(core.handle.toLowerCase())) // If permanently deleted from DB, hide completely
+              .map((core) => {
+                const live = itemsMap.get(core.handle.toLowerCase());
+                if (!live) return core;
+                return {
+                  ...core,
+                  displayName: live.displayName || core.displayName,
+                  bio: live.bio !== undefined && live.bio !== null && live.bio !== '' ? live.bio : core.bio,
+                  isDeactivated: Boolean(live.isDeactivated || live.isActive === false),
+                  badge: Boolean(live.isDeactivated || live.isActive === false) ? 'Deactivated 🔒' : core.badge,
+                  avatar:
+                    live.avatar?.smallUrl ||
+                    live.avatar?.largeUrl ||
+                    live.avatarUrl ||
+                    (typeof live.avatar === 'string' ? live.avatar : core.avatar),
+                };
+              })
           );
 
           const coreHandles = new Set(ALL_PROFILES.map((p) => p.handle.toLowerCase()));
           const community = res.items
             .filter((u) => !coreHandles.has(u.handle.toLowerCase()))
-            .map((u) => ({
-              id: u.id,
-              handle: u.handle,
-              displayName: u.displayName || u.handle,
-              bio: u.bio || 'New Community Creator',
-              badge: 'Community 🌟',
-              avatar:
-                u.avatar?.smallUrl ||
-                u.avatar?.largeUrl ||
-                u.avatarUrl ||
-                (typeof u.avatar === 'string' ? u.avatar : null),
-            }));
+            .map((u) => {
+              const isDeact = Boolean(u.isDeactivated || u.isActive === false);
+              return {
+                id: u.id,
+                handle: u.handle,
+                displayName: u.displayName || u.handle,
+                bio: isDeact ? 'Account temporarily deactivated' : (u.bio || 'New Community Creator'),
+                badge: isDeact ? 'Deactivated 🔒' : 'Community 🌟',
+                isDeactivated: isDeact,
+                avatar:
+                  u.avatar?.smallUrl ||
+                  u.avatar?.largeUrl ||
+                  u.avatarUrl ||
+                  (typeof u.avatar === 'string' ? u.avatar : null),
+              };
+            });
           setCommunityUsers(community);
         }
       })
       .catch(() => {});
-  }, [currentUser]);
+  }, [currentUser, refreshKey]);
 
   // Filter core profiles: exclude current user if logged in
   const visibleCoreProfiles = coreProfiles.filter(
@@ -274,22 +283,33 @@ export function SuggestedProfiles({
                 <div className="suggested-profile-card__badge">{p.badge}</div>
               </div>
 
-              <button
-                type="button"
-                className={`suggested-profile-card__follow-btn ${
-                  isFollowing ? 'suggested-profile-card__follow-btn--following' : ''
-                }`}
-                onClick={() => handleFollowClick(p)}
-                title={
-                  !currentUser
-                    ? 'Sign in to follow @' + p.handle
-                    : isFollowing
-                    ? 'Unfollow @' + p.handle
-                    : 'Follow @' + p.handle
-                }
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </button>
+              {p.isDeactivated ? (
+                <button
+                  type="button"
+                  className="suggested-profile-card__follow-btn suggested-profile-card__follow-btn--deactivated"
+                  disabled
+                  title="This account has been temporarily deleted (deactivated)"
+                >
+                  Deactivated
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`suggested-profile-card__follow-btn ${
+                    isFollowing ? 'suggested-profile-card__follow-btn--following' : ''
+                  }`}
+                  onClick={() => handleFollowClick(p)}
+                  title={
+                    !currentUser
+                      ? 'Sign in to follow @' + p.handle
+                      : isFollowing
+                      ? 'Unfollow @' + p.handle
+                      : 'Follow @' + p.handle
+                  }
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+              )}
             </div>
           );
         })}
@@ -346,22 +366,33 @@ export function SuggestedProfiles({
                   <div className="suggested-profile-card__badge">{p.badge}</div>
                 </div>
 
-                <button
-                  type="button"
-                  className={`suggested-profile-card__follow-btn ${
-                    isFollowing ? 'suggested-profile-card__follow-btn--following' : ''
-                  }`}
-                  onClick={() => handleFollowClick(p)}
-                  title={
-                    !currentUser
-                      ? 'Sign in to follow @' + p.handle
-                      : isFollowing
-                      ? 'Unfollow @' + p.handle
-                      : 'Follow @' + p.handle
-                  }
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </button>
+                {p.isDeactivated ? (
+                  <button
+                    type="button"
+                    className="suggested-profile-card__follow-btn suggested-profile-card__follow-btn--deactivated"
+                    disabled
+                    title="This account has been temporarily deleted (deactivated)"
+                  >
+                    Deactivated
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`suggested-profile-card__follow-btn ${
+                      isFollowing ? 'suggested-profile-card__follow-btn--following' : ''
+                    }`}
+                    onClick={() => handleFollowClick(p)}
+                    title={
+                      !currentUser
+                        ? 'Sign in to follow @' + p.handle
+                        : isFollowing
+                        ? 'Unfollow @' + p.handle
+                        : 'Follow @' + p.handle
+                    }
+                  >
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </button>
+                )}
               </div>
             );
           })}

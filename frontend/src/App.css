@@ -180,3 +180,162 @@
     order: 1;
   }
 }
+
+/* ==========================================================================
+   Account Notification Banner (Reactivation, Deactivation, Deletion)
+   ========================================================================== */
+.app__notice-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: calc(100% - 32px);
+  max-width: 900px;
+  margin: 0 auto 16px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  animation: slideDownFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.app__notice-banner--warning {
+  background: rgba(234, 179, 8, 0.14);
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  color: #facc15;
+}
+
+.app__notice-banner--success {
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+}
+
+.app__notice-banner--info {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #f87171;
+}
+
+.app__notice-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app__notice-banner-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.app__notice-banner-message {
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+.app__notice-banner-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.7;
+  padding: 4px 8px;
+  transition: opacity 0.2s;
+}
+
+.app__notice-banner-close:hover {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   Deactivated Profile Notice Card
+   ========================================================================== */
+.app__deactivated-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 32px 16px;
+  box-sizing: border-box;
+}
+
+.app__deactivated-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 44px 32px;
+  max-width: 520px;
+  width: 100%;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  animation: fadeInScale 0.35s ease;
+}
+
+.app__deactivated-avatar-wrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.app__deactivated-avatar-fallback {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #475569, #334155);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  border: 2px dashed rgba(148, 163, 184, 0.4);
+}
+
+.app__deactivated-lock-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  background: #ef4444;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  border: 3px solid var(--color-bg-surface);
+}
+
+.app__deactivated-heading {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 12px 0;
+}
+
+.app__deactivated-pill {
+  display: inline-block;
+  padding: 8px 18px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 18px;
+  letter-spacing: 0.2px;
+}
+
+.app__deactivated-text {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin: 0 0 24px 0;
+  max-width: 420px;
+}

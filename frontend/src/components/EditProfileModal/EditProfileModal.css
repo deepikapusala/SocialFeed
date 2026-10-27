@@ -381,3 +381,230 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* ==========================================================================
+   Account Deletion (Danger Zone & Submodal)
+   ========================================================================== */
+
+.edit-profile-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-top: 6px;
+  background-color: rgba(239, 68, 68, 0.06);
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+}
+
+.edit-profile-danger-zone__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.edit-profile-danger-zone__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+.edit-profile-danger-zone__subtitle {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.edit-profile-danger-zone__btn {
+  padding: 6px 14px;
+  background-color: transparent;
+  border: 1.5px solid rgba(239, 68, 68, 0.6);
+  border-radius: var(--radius-full);
+  color: #ef4444;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.edit-profile-danger-zone__btn:hover {
+  background-color: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+  transform: translateY(-1px);
+}
+
+/* Sub-Modal Overlay */
+.edit-profile-deletion-modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  animation: editFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.edit-profile-deletion-modal {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background-color: var(--color-bg-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  box-sizing: border-box;
+  animation: editSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.edit-profile-deletion-modal__header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.edit-profile-deletion-modal__icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.edit-profile-deletion-modal__title {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.edit-profile-deletion-modal__subtitle {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.edit-profile-deletion-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Options */
+.edit-profile-deletion-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-elevated);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.edit-profile-deletion-option:hover {
+  border-color: rgba(255, 64, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+.edit-profile-deletion-option--selected {
+  border-color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.08);
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+
+.edit-profile-deletion-option--selected-danger {
+  border-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.08);
+  box-shadow: 0 0 0 1px #ef4444;
+}
+
+.edit-profile-deletion-radio {
+  margin-top: 3px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.edit-profile-deletion-option__content {
+  flex: 1;
+}
+
+.edit-profile-deletion-option__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.edit-profile-deletion-option__name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.edit-profile-deletion-badge {
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.edit-profile-deletion-badge--temporary {
+  background-color: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+}
+
+.edit-profile-deletion-badge--permanent {
+  background-color: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+}
+
+.edit-profile-deletion-option__desc {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.edit-profile-field--deletion-password {
+  margin-top: 4px;
+}
+
+.edit-profile-deletion-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.edit-profile-btn--deactivate {
+  background-color: #f59e0b;
+  border: 1px solid #f59e0b;
+  color: #ffffff;
+}
+
+.edit-profile-btn--deactivate:hover:not(:disabled) {
+  background-color: #d97706;
+  border-color: #d97706;
+}
+
+.edit-profile-btn--delete-permanent {
+  background-color: #ef4444;
+  border: 1px solid #ef4444;
+  color: #ffffff;
+}
+
+.edit-profile-btn--delete-permanent:hover:not(:disabled) {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+

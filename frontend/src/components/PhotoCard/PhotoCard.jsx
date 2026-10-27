@@ -77,11 +77,23 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectA
                 style={{ cursor: onSelectAuthor ? 'pointer' : 'default' }}
                 title={`Filter posts by @${authorHandle}`}
               >
-                <img
-                  className="photo-card__author-avatar"
-                  src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}
-                  alt={authorHandle}
-                />
+                {post.userAvatar ? (
+                  <img
+                    className="photo-card__author-avatar"
+                    src={post.userAvatar}
+                    alt={authorHandle}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="photo-card__author-avatar-fallback"
+                  style={{ display: post.userAvatar ? 'none' : 'flex' }}
+                >
+                  {(post.displayName || authorHandle || 'U').charAt(0).toUpperCase()}
+                </div>
                 <span className="photo-card__author-username">@{authorHandle}</span>
               </div>
               {!isSelf ? (
@@ -140,11 +152,23 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectA
           <div className="photo-card__text-content">
             <div className="photo-card__text-header">
               <div className="photo-card__text-user-group">
-                <img
-                  className="photo-card__text-avatar"
-                  src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}
-                  alt={authorHandle}
-                />
+                {post.userAvatar ? (
+                  <img
+                    className="photo-card__text-avatar"
+                    src={post.userAvatar}
+                    alt={authorHandle}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="photo-card__author-avatar-fallback"
+                  style={{ display: post.userAvatar ? 'none' : 'flex' }}
+                >
+                  {(post.displayName || authorHandle || 'U').charAt(0).toUpperCase()}
+                </div>
                 <div className="photo-card__text-user">
                   <span className="photo-card__text-username">@{authorHandle}</span>
                   <span className="photo-card__text-time">{post.timeAgo || 'recently'}</span>

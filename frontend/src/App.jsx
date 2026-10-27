@@ -14,6 +14,7 @@ import {
   logoutApi,
   searchPostsApi,
   fetchCurrentUserApi,
+  fetchUsersApi,
 } from './utils/api';
 import './App.css';
 
@@ -43,6 +44,13 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
+
+  // All users cache & refresh key
+  const [allUsers, setAllUsers] = useState([]);
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
+
+  // Account banner notice (deactivation, deletion, reactivation)
+  const [accountNotice, setAccountNotice] = useState(null);
 
   // Search query & results state
   const [searchQuery, setSearchQuery] = useState('');
@@ -332,22 +340,73 @@ export function App() {
     fetchFeedBatch(true, null);
   }, [fetchFeedBatch]);
 
+  const refreshUsers = useCallback(async () => {
+    try {
+      const res = await fetchUsersApi();
+      if (res?.items) {
+        setAllUsers(res.items);
+        setUsersRefreshKey((prev) => prev + 1);
+      }
+    } catch (e) {
+      console.warn('Could not refresh users:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshUsers();
+  }, [refreshUsers, currentUser]);
+
   /**
    * Authentication handlers
    */
   const handleAuthSuccess = useCallback((user) => {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
+    setAccountNotice({
+      type: 'success',
+      title: `Welcome back, @${user.handle}!`,
+      message: 'Your account is active. All your posts and profile have been restored.',
+    });
     // Reload feed immediately to display following feed for authenticated user
     fetchFeedBatch(true, null);
-  }, [fetchFeedBatch]);
+    refreshUsers();
+  }, [fetchFeedBatch, refreshUsers]);
 
   const handleLogout = useCallback(async () => {
     await logoutApi();
     setCurrentUser(null);
     // Reload feed immediately to restore default public explore feed
     fetchFeedBatch(true, null);
-  }, [fetchFeedBatch]);
+    refreshUsers();
+  }, [fetchFeedBatch, refreshUsers]);
+
+  const handleAccountDeactivated = useCallback(async ({ type, handle }) => {
+    try {
+      await logoutApi();
+    } catch (err) {
+      console.warn('Logout cleanup error:', err);
+    }
+    setCurrentUser(null);
+    setIsEditProfileModalOpen(false);
+
+    if (type === 'temporary') {
+      setAccountNotice({
+        type: 'warning',
+        title: `@${handle} Deactivated`,
+        message: 'account has been temporarily deleted (deactivated). You can reactivate anytime by logging back in.',
+      });
+    } else {
+      setAccountNotice({
+        type: 'info',
+        title: `@${handle} Permanently Deleted`,
+        message: 'Account has been permanently deleted. All posts and data have been removed.',
+      });
+    }
+
+    // Refresh feed to default guest view
+    await fetchFeedBatch(true, null);
+    await refreshUsers();
+  }, [fetchFeedBatch, refreshUsers]);
 
   const handleRetry = () => {
     fetchFeedBatch(posts.length === 0, cursor);
@@ -404,6 +463,16 @@ export function App() {
   }, [searchQuery, posts]);
 
   const isSearchActive = Boolean(searchQuery.trim());
+  const cleanSearchTerm = searchQuery.trim().toLowerCase().replace(/^@/, '');
+  const matchedDeactivatedUser = cleanSearchTerm
+    ? allUsers.find(
+        (u) =>
+          (u.isDeactivated || u.isActive === false) &&
+          (u.handle.toLowerCase() === cleanSearchTerm ||
+           (u.displayName && u.displayName.toLowerCase() === cleanSearchTerm))
+      )
+    : null;
+
   const filteredPosts = isSearchActive
     ? (searchResults !== null ? searchResults : [])
     : posts;
@@ -513,6 +582,24 @@ export function App() {
         onSelectPost={handleSelectPost}
       />
 
+      {/* Account Notification Banner (Reactivation, Deactivation, Deletion) */}
+      {accountNotice && (
+        <div className={`app__notice-banner app__notice-banner--${accountNotice.type}`} role="alert">
+          <div className="app__notice-banner-content">
+            <span className="app__notice-banner-title">{accountNotice.title}</span>
+            <span className="app__notice-banner-message">{accountNotice.message}</span>
+          </div>
+          <button
+            type="button"
+            className="app__notice-banner-close"
+            onClick={() => setAccountNotice(null)}
+            aria-label="Dismiss banner"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Feed confirmation banner when logged in */}
       {currentUser && (
         <div className="app__feed-banner" role="status">
@@ -537,34 +624,64 @@ export function App() {
             </div>
           )}
 
-          {/* Message when no posts match search */}
-          {isSearchActive && filteredPosts.length === 0 && !isSearching && !loading && (
-            <div className="app__empty-search">
-              <p className="app__empty-title">No posts found for "{searchQuery}"</p>
-              <p className="app__empty-subtitle">
-                Try searching any word from caption, username (@deepu, @sneha, etc.), or bio (e.g. gourmet, flora, books, cricket, acoustic)...
-              </p>
-              <button
-                type="button"
-                className="app__clear-search-btn"
-                onClick={() => setSearchQuery('')}
-              >
-                Show All Posts
-              </button>
+          {/* Deactivated Profile Notice View */}
+          {matchedDeactivatedUser ? (
+            <div className="app__deactivated-page" role="status">
+              <div className="app__deactivated-card">
+                <div className="app__deactivated-avatar-wrapper">
+                  <div className="app__deactivated-avatar-fallback">
+                    {(matchedDeactivatedUser.displayName || matchedDeactivatedUser.handle || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <span className="app__deactivated-lock-badge" aria-hidden="true">🔒</span>
+                </div>
+                <h2 className="app__deactivated-heading">@{matchedDeactivatedUser.handle}</h2>
+                <div className="app__deactivated-pill">
+                  account has been temporarily deleted (deactivated)
+                </div>
+                <p className="app__deactivated-text">
+                  The account owner has temporarily deactivated this account. All posts, profile information, and activity are hidden until the owner logs back in to reactivate.
+                </p>
+                <button
+                  type="button"
+                  className="app__clear-search-btn"
+                  onClick={() => setSearchQuery('')}
+                >
+                  Show All Posts
+                </button>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Message when no posts match search */}
+              {isSearchActive && filteredPosts.length === 0 && !isSearching && !loading && (
+                <div className="app__empty-search">
+                  <p className="app__empty-title">No posts found for "{searchQuery}"</p>
+                  <p className="app__empty-subtitle">
+                    Try searching any word from caption, username (@deepu, @sneha, etc.), or bio (e.g. gourmet, flora, books, cricket, acoustic)...
+                  </p>
+                  <button
+                    type="button"
+                    className="app__clear-search-btn"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    Show All Posts
+                  </button>
+                </div>
+              )}
 
-          {/* Main Post Grid */}
-          {(!error || posts.length > 0) && (
-            <PhotoGrid
-              posts={filteredPosts}
-              onSelectPost={handleSelectPost}
-              onToggleFollow={handleToggleFollow}
-              onLoadMore={() => loadPosts(false)}
-              hasMore={isSearchActive ? false : hasMore}
-              loading={loading}
-              onSelectAuthor={(handle) => setSearchQuery(`@${handle}`)}
-            />
+              {/* Main Post Grid */}
+              {(!error || posts.length > 0) && (
+                <PhotoGrid
+                  posts={filteredPosts}
+                  onSelectPost={handleSelectPost}
+                  onToggleFollow={handleToggleFollow}
+                  onLoadMore={() => loadPosts(false)}
+                  hasMore={isSearchActive ? false : hasMore}
+                  loading={loading}
+                  onSelectAuthor={(handle) => setSearchQuery(`@${handle}`)}
+                />
+              )}
+            </>
           )}
 
           {/* Secondary Error Banner when subsequent page fails to load */}
@@ -588,6 +705,7 @@ export function App() {
             onToggleFollow={handleToggleFollow}
             followingMap={followingMap}
             onSelectProfile={(handle) => setSearchQuery(`@${handle}`)}
+            refreshKey={usersRefreshKey}
           />
         </aside>
       </div>
@@ -618,6 +736,7 @@ export function App() {
         onClose={() => setIsEditProfileModalOpen(false)}
         currentUser={currentUser}
         onProfileUpdated={handleProfileUpdated}
+        onAccountDeactivated={handleAccountDeactivated}
       />
 
       {/* Create Post Modal */}
