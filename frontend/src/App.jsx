@@ -141,6 +141,12 @@ export function App() {
    * Toggle follow state for an author across all posts and sidebar synchronously.
    */
   const handleToggleFollow = useCallback(async ({ authorId, authorHandle, shouldFollow }) => {
+    // 0. If user is not logged in (default page), redirect to sign in / sign up!
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     // 1. Update followingMap immediately
     if (authorHandle) {
       setFollowingMap((prev) => ({
@@ -213,7 +219,7 @@ export function App() {
         );
       }
     }
-  }, []);
+  }, [currentUser]);
 
   /**
    * Fetch a batch of posts from FastAPI backend API.
@@ -435,6 +441,8 @@ export function App() {
           onClose={handleClosePost}
           onUpdatePost={handleUpdatePost}
           onToggleFollow={handleToggleFollow}
+          currentUser={currentUser}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
         />
       )}
 

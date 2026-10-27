@@ -9,7 +9,14 @@ import './PhotoViewer.css';
  * belonging to the selected post. If the post has no media, renders the post cleanly without
  * an image stage.
  */
-export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
+export function PhotoViewer({
+  post,
+  onClose,
+  onUpdatePost,
+  onToggleFollow,
+  currentUser,
+  onOpenAuth,
+}) {
   const images = Array.isArray(post.images)
     ? post.images
     : (post.imageUrl ? [post.imageUrl] : []);
@@ -18,16 +25,18 @@ export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
 
   const authorId = post.authorId || post.author?.id;
   const authorHandle = post.username || post.author?.handle || 'user';
-  const storedUser = getStoredUser();
-  const storedHandle = storedUser?.handle?.toLowerCase();
-  const isSelf = storedHandle
-    ? authorHandle.toLowerCase() === storedHandle
-    : (authorHandle.toLowerCase() === 'asha' || authorId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-  const isFollowing = Boolean(post.followedByViewer || post.author?.followedByViewer);
+  const activeUser = currentUser || getStoredUser();
+  const activeHandle = activeUser?.handle?.toLowerCase();
+  const isSelf = Boolean(activeHandle && authorHandle.toLowerCase() === activeHandle);
+  const isFollowing = Boolean(activeUser && (post.followedByViewer || post.author?.followedByViewer));
 
   const handleFollowClick = (e) => {
     e.stopPropagation();
     e.preventDefault();
+    if (!activeUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
     if (onToggleFollow) {
       onToggleFollow({
         authorId,
@@ -137,6 +146,11 @@ export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
   };
 
   const handleToggleLike = async () => {
+    if (!activeUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
     const nextLiked = !isLiked;
     setIsLiked(nextLiked); // Optimistic UI update
 
@@ -155,6 +169,11 @@ export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
   };
 
   const handleToggleRepost = async () => {
+    if (!activeUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
     const nextReposted = !isReposted;
     setIsReposted(nextReposted); // Optimistic UI update
 
@@ -184,6 +203,11 @@ export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
 
   const handleAddComment = async (e) => {
     e.preventDefault();
+    if (!activeUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
     const text = commentInput.trim();
     if (!text) return;
 
@@ -191,7 +215,7 @@ export function PhotoViewer({ post, onClose, onUpdatePost, onToggleFollow }) {
     const tempId = `temp-${Date.now()}`;
     const optimisticComment = {
       id: tempId,
-      username: 'asha',
+      username: activeUser?.handle || 'user',
       text: text,
     };
     setComments((prev) => [...prev, optimisticComment]);

@@ -22,10 +22,8 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow }) {
   const authorHandle = post.username || post.author?.handle || 'user';
   const storedUser = getStoredUser();
   const storedHandle = storedUser?.handle?.toLowerCase();
-  const isSelf = storedHandle
-    ? authorHandle.toLowerCase() === storedHandle
-    : (authorHandle.toLowerCase() === 'asha' || authorId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-  const isFollowing = Boolean(post.followedByViewer || post.author?.followedByViewer);
+  const isSelf = Boolean(storedHandle && authorHandle.toLowerCase() === storedHandle);
+  const isFollowing = Boolean(storedUser && (post.followedByViewer || post.author?.followedByViewer));
 
   const handleFollowClick = (e) => {
     e.stopPropagation();
