@@ -347,6 +347,7 @@ export async function fetchRepliesApi(postId, cursor = null, limit = 20) {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
+      ...getAuthHeaders(),
     },
   });
 

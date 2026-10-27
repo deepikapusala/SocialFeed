@@ -894,6 +894,20 @@ class PostgresRepository:
                     target_post_id=post_uuid,
                 )
 
+            # Also trigger notification for any @mentioned users in the reply (e.g. replying to a comment)
+            import re
+            mentioned_handles = set(re.findall(r"@([a-zA-Z0-9_]+)", text))
+            for m_handle in mentioned_handles:
+                u_res = await self._session.execute(select(User).where(func.lower(User.handle) == m_handle.lower()))
+                mentioned_user = u_res.scalar_one_or_none()
+                if mentioned_user and mentioned_user.id != author_uuid:
+                    await self._create_notification(
+                        recipient_id=mentioned_user.id,
+                        actor_id=author_uuid,
+                        event_type="reply",
+                        target_post_id=post_uuid,
+                    )
+
             await self._session.flush()
             return await self.get_post_detail(str(post_uuid), viewer_id=author_id)  # type: ignore
 

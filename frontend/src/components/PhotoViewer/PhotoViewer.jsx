@@ -78,10 +78,20 @@ export function PhotoViewer({
           if (res?.items?.length > 0) {
             const replyList = res.items.map((r) => ({
               id: r.id,
-              username: r.author?.handle || r.username || 'user',
+              username: r.username || r.author?.handle || 'user',
+              userAvatar:
+                r.userAvatar ||
+                r.author?.avatar?.smallUrl ||
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80',
               text: r.text || r.caption || '',
+              likeCount: r.likeCount ?? r.likes ?? 0,
+              likedByViewer: Boolean(r.likedByViewer),
+              timeAgo: r.timeAgo || 'recently',
+              createdAt: r.createdAt,
             }));
             setComments(replyList);
+          } else {
+            setComments([]);
           }
         })
         .catch(() => {});
@@ -206,6 +216,72 @@ export function PhotoViewer({
     }
   };
 
+  const handleToggleCommentLike = async (commentId) => {
+    if (!activeUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
+    const targetComment = comments.find((c) => c.id === commentId);
+    if (!targetComment) return;
+
+    const nextLiked = !targetComment.likedByViewer;
+    const nextCount = Math.max(0, (targetComment.likeCount || 0) + (nextLiked ? 1 : -1));
+
+    // Optimistic UI update
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId
+          ? { ...c, likedByViewer: nextLiked, likeCount: nextCount }
+          : c
+      )
+    );
+
+    try {
+      const res = await toggleLikeApi(commentId, nextLiked);
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                likedByViewer: res.likedByViewer,
+                likeCount: res.likeCount ?? nextCount,
+              }
+            : c
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update comment like on server:', err);
+      // Revert on error
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? { ...c, likedByViewer: !nextLiked, likeCount: targetComment.likeCount }
+            : c
+        )
+      );
+    }
+  };
+
+  const handleReplyToComment = (commentUsername) => {
+    if (!activeUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
+    const prefix = `@${commentUsername} `;
+    setCommentInput(prefix);
+    if (commentInputRef.current) {
+      commentInputRef.current.focus();
+      setTimeout(() => {
+        if (commentInputRef.current) {
+          const len = prefix.length;
+          commentInputRef.current.setSelectionRange(len, len);
+        }
+      }, 0);
+    }
+  };
+
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!activeUser) {
@@ -221,7 +297,15 @@ export function PhotoViewer({
     const optimisticComment = {
       id: tempId,
       username: activeUser?.handle || 'user',
+      userAvatar:
+        activeUser?.avatar?.smallUrl ||
+        activeUser?.avatar?.largeUrl ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80',
       text: text,
+      likeCount: 0,
+      likedByViewer: false,
+      timeAgo: 'just now',
+      createdAt: new Date().toISOString(),
     };
     setComments((prev) => [...prev, optimisticComment]);
     setCommentInput('');
@@ -232,7 +316,19 @@ export function PhotoViewer({
       setComments((prev) =>
         prev.map((c) =>
           c.id === tempId
-            ? { id: savedReply.id, username: savedReply.username || 'asha', text: savedReply.text }
+            ? {
+                id: savedReply.id,
+                username: savedReply.username || savedReply.author?.handle || activeUser?.handle || 'user',
+                userAvatar:
+                  savedReply.userAvatar ||
+                  savedReply.author?.avatar?.smallUrl ||
+                  optimisticComment.userAvatar,
+                text: savedReply.text,
+                likeCount: savedReply.likeCount ?? 0,
+                likedByViewer: Boolean(savedReply.likedByViewer),
+                timeAgo: 'just now',
+                createdAt: savedReply.createdAt || new Date().toISOString(),
+              }
             : c
         )
       );
@@ -518,9 +614,51 @@ export function PhotoViewer({
           {comments.length > 0 && (
             <div className="post-modal__comments-list">
               {comments.map((c) => (
-                <p key={c.id} className="post-modal__comment-item">
-                  <strong>{c.username}</strong> <span>{c.text}</span>
-                </p>
+                <div key={c.id} className="post-modal__comment-row">
+                  <img
+                    className="post-modal__comment-avatar"
+                    src={c.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}
+                    alt={c.username}
+                  />
+                  <div className="post-modal__comment-content">
+                    <p className="post-modal__comment-text">
+                      <strong className="post-modal__comment-username">@{c.username}</strong>{' '}
+                      <span className="post-modal__comment-body">{c.text}</span>
+                    </p>
+                    <div className="post-modal__comment-meta">
+                      <span className="post-modal__comment-time">{c.timeAgo || 'recently'}</span>
+                      {c.likeCount > 0 && (
+                        <span className="post-modal__comment-likes-count">
+                          {c.likeCount} {c.likeCount === 1 ? 'like' : 'likes'}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="post-modal__comment-reply-btn"
+                        onClick={() => handleReplyToComment(c.username)}
+                      >
+                        Reply
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`post-modal__comment-like-btn ${c.likedByViewer ? 'is-liked' : ''}`}
+                    onClick={() => handleToggleCommentLike(c.id)}
+                    aria-label={c.likedByViewer ? 'Unlike comment' : 'Like comment'}
+                    title={c.likedByViewer ? 'Unlike' : 'Like'}
+                  >
+                    {c.likedByViewer ? (
+                      <svg className="icon-heart-filled" viewBox="0 0 24 24" width="13" height="13">
+                        <path fill="#ef4444" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                      </svg>
+                    ) : (
+                      <svg className="icon-heart-outline" viewBox="0 0 24 24" width="13" height="13">
+                        <path fill="currentColor" d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
               ))}
             </div>
           )}

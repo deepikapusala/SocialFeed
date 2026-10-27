@@ -123,11 +123,8 @@ export function NotificationPopover({ currentUser, onOpenAuth, onSelectPost }) {
     }
 
     if (notif.targetPost && notif.targetPost.id && onSelectPost) {
-      // If it is a reply (comment) notification, open the parent post that was commented on!
-      const targetPostId =
-        notif.eventType === 'reply' && notif.targetPost.replyToId
-          ? notif.targetPost.replyToId
-          : notif.targetPost.id;
+      // If target is a comment (reply), navigate directly to the parent photo post
+      const targetPostId = notif.targetPost.replyToId || notif.targetPost.id;
 
       onSelectPost(targetPostId, {
         notification: notif,
@@ -144,9 +141,10 @@ export function NotificationPopover({ currentUser, onOpenAuth, onSelectPost }) {
     const actorHandle = notif.actor?.handle || 'someone';
     switch (notif.eventType) {
       case 'like':
+        const isCommentLike = notif.targetPost?.kind === 'reply' || Boolean(notif.targetPost?.replyToId);
         return (
           <>
-            <strong>@{actorHandle}</strong> liked your photo.
+            <strong>@{actorHandle}</strong> {isCommentLike ? 'liked your comment.' : 'liked your photo.'}
           </>
         );
       case 'follow':
