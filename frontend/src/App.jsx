@@ -396,9 +396,17 @@ export function App() {
     : posts;
 
   const handleProfileUpdated = useCallback((updatedUser) => {
+    const newAvatarUrl =
+      updatedUser.avatar?.largeUrl ||
+      updatedUser.avatar?.smallUrl ||
+      updatedUser.avatarUrl ||
+      (typeof updatedUser.avatar === 'string' ? updatedUser.avatar : null);
+
     setCurrentUser((prev) => ({
       ...prev,
       ...updatedUser,
+      avatar: updatedUser.avatar || prev?.avatar,
+      avatarUrl: newAvatarUrl !== undefined ? newAvatarUrl : prev?.avatarUrl,
     }));
 
     // Update feed posts authored by this user
@@ -410,12 +418,14 @@ export function App() {
             ...p,
             username: updatedUser.handle,
             displayName: updatedUser.displayName,
+            userAvatar: newAvatarUrl !== undefined ? newAvatarUrl : p.userAvatar,
             author: p.author
               ? {
                   ...p.author,
                   handle: updatedUser.handle,
                   displayName: updatedUser.displayName,
                   bio: updatedUser.bio,
+                  avatar: updatedUser.avatar || p.author.avatar,
                 }
               : p.author,
           };
@@ -423,6 +433,30 @@ export function App() {
         return p;
       })
     );
+
+    // Also update selectedPost if it's currently open and authored by this user
+    setSelectedPost((prev) => {
+      if (!prev) return null;
+      const authorId = prev.authorId || prev.author?.id;
+      if (authorId === updatedUser.id) {
+        return {
+          ...prev,
+          username: updatedUser.handle,
+          displayName: updatedUser.displayName,
+          userAvatar: newAvatarUrl !== undefined ? newAvatarUrl : prev.userAvatar,
+          author: prev.author
+            ? {
+                ...prev.author,
+                handle: updatedUser.handle,
+                displayName: updatedUser.displayName,
+                bio: updatedUser.bio,
+                avatar: updatedUser.avatar || prev.author.avatar,
+              }
+            : prev.author,
+        };
+      }
+      return prev;
+    });
   }, []);
 
   const handleUpdatePost = useCallback((postId, updates) => {

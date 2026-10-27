@@ -3,14 +3,27 @@ import { updateProfileApi } from '../../utils/api';
 import './EditProfileModal.css';
 
 /**
+ * Quick Unsplash preset samples for convenient testing or avatar choice.
+ */
+const SAMPLE_AVATARS = [
+  { label: '📸 Portrait', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' },
+  { label: '🌸 Nature', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80' },
+  { label: '📚 Aesthetic', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80' },
+  { label: '🎧 Studio', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80' },
+  { label: '🏏 Athletic', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80' },
+];
+
+/**
  * EditProfileModal component.
- * Allows authenticated users to edit their Display Name, Username/Handle, and Bio.
+ * Allows authenticated users to edit their Display Name, Username/Handle, Bio, and Avatar (via Unsplash / Web URL).
  * Persists updates to PostgreSQL users table via PATCH /users/me.
  */
 export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdated }) {
   const [displayName, setDisplayName] = useState('');
   const [handle, setHandle] = useState('');
   const [bio, setBio] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [imageLoadError, setImageLoadError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -20,6 +33,16 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
       setDisplayName(currentUser.displayName || currentUser.handle || '');
       setHandle(currentUser.handle || '');
       setBio(currentUser.bio || '');
+
+      const existingAvatar =
+        currentUser.avatar?.largeUrl ||
+        currentUser.avatar?.smallUrl ||
+        currentUser.avatarUrl ||
+        (typeof currentUser.avatar === 'string' ? currentUser.avatar : '') ||
+        '';
+
+      setAvatarUrl(existingAvatar);
+      setImageLoadError(false);
       setError(null);
     }
   }, [currentUser, isOpen]);
@@ -33,6 +56,7 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
     const cleanDisplay = displayName.trim();
     const cleanHandle = handle.trim().toLowerCase();
     const cleanBio = bio.trim();
+    const cleanAvatar = avatarUrl.trim();
 
     if (!cleanDisplay) {
       setError('Display name cannot be empty.');
@@ -49,6 +73,11 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
       return;
     }
 
+    if (cleanAvatar && !cleanAvatar.startsWith('http://') && !cleanAvatar.startsWith('https://')) {
+      setError('Please provide a valid web image URL (starting with https:// or http://).');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -56,6 +85,9 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
         displayName: cleanDisplay,
         handle: cleanHandle,
         bio: cleanBio,
+        avatarUrl: cleanAvatar || null,
+        avatarSmallUrl: cleanAvatar || null,
+        avatarLargeUrl: cleanAvatar || null,
       });
 
       if (onProfileUpdated) {
@@ -69,12 +101,7 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
     }
   };
 
-  const userAvatar =
-    currentUser.avatar?.smallUrl ||
-    currentUser.avatar?.largeUrl ||
-    currentUser.avatarUrl ||
-    currentUser.avatar ||
-    null;
+  const previewAvatar = avatarUrl.trim();
 
   return (
     <div className="edit-profile-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
@@ -92,30 +119,25 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
 
         <header className="edit-profile-modal__header">
           <div className="edit-profile-modal__avatar-wrapper">
-            {userAvatar ? (
+            {previewAvatar && !imageLoadError ? (
               <img
-                src={userAvatar}
-                alt={currentUser.handle}
+                src={previewAvatar}
+                alt={handle || 'Profile avatar'}
                 className="edit-profile-modal__avatar"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                }}
+                onError={() => setImageLoadError(true)}
               />
-            ) : null}
-            <div
-              className="edit-profile-modal__avatar-fallback"
-              style={{ display: userAvatar ? 'none' : 'flex' }}
-            >
-              {(displayName || handle || 'U').charAt(0).toUpperCase()}
-            </div>
+            ) : (
+              <div className="edit-profile-modal__avatar-fallback">
+                {(displayName || handle || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
 
           <h2 id="edit-profile-title" className="edit-profile-modal__title">
             Edit Profile
           </h2>
           <p className="edit-profile-modal__subtitle">
-            Update your public profile information across the app
+            Update your public profile information & avatar across the app
           </p>
         </header>
 
@@ -127,6 +149,63 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
         )}
 
         <form className="edit-profile-modal__form" onSubmit={handleSubmit}>
+          {/* Avatar URL Input */}
+          <div className="edit-profile-field">
+            <div className="edit-profile-field__header">
+              <label htmlFor="edit-profile-avatar" className="edit-profile-label">
+                Profile Photo (Unsplash / Web URL)
+              </label>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  className="edit-profile-clear-avatar-btn"
+                  onClick={() => {
+                    setAvatarUrl('');
+                    setImageLoadError(false);
+                  }}
+                  title="Remove photo"
+                >
+                  Remove Photo
+                </button>
+              )}
+            </div>
+            <input
+              id="edit-profile-avatar"
+              type="url"
+              className="edit-profile-input"
+              value={avatarUrl}
+              onChange={(e) => {
+                setAvatarUrl(e.target.value);
+                setImageLoadError(false);
+              }}
+              placeholder="Paste Unsplash URL (e.g. https://images.unsplash.com/...)"
+            />
+            <span className="edit-profile-hint">
+              Paste an Unsplash image link to update your avatar. Shows instant live preview above!
+            </span>
+
+            {/* Quick Sample Avatars */}
+            <div className="edit-profile-samples">
+              <span className="edit-profile-samples__label">Quick samples:</span>
+              <div className="edit-profile-samples__list">
+                {SAMPLE_AVATARS.map((sample, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="edit-profile-sample-chip"
+                    onClick={() => {
+                      setAvatarUrl(sample.url);
+                      setImageLoadError(false);
+                    }}
+                    title={sample.label}
+                  >
+                    {sample.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Display Name Input */}
           <div className="edit-profile-field">
             <label htmlFor="edit-profile-display-name" className="edit-profile-label">

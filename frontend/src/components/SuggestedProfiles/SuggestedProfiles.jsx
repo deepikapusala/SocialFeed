@@ -83,8 +83,11 @@ export function SuggestedProfiles({
               handle: u.handle,
               displayName: u.displayName || u.handle,
               bio: u.bio || 'New Community Creator',
-              badge: 'Community 🌟',
-              avatar: u.avatar || null,
+              avatar:
+                u.avatar?.smallUrl ||
+                u.avatar?.largeUrl ||
+                u.avatarUrl ||
+                (typeof u.avatar === 'string' ? u.avatar : null),
             }));
           setCommunityUsers(community);
         }

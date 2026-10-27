@@ -18,6 +18,7 @@ class ProfileUpdateRequest(CamelModel):
     bio: Optional[str] = Field(None, max_length=500)
     avatar_small_url: Optional[str] = Field(None, max_length=1000)
     avatar_large_url: Optional[str] = Field(None, max_length=1000)
+    avatar_url: Optional[str] = Field(None, max_length=1000)
     is_private: Optional[bool] = Field(None)
 
     @field_validator("handle")
@@ -50,14 +51,16 @@ class ProfileUpdateRequest(CamelModel):
             return v.strip()
         return None
 
-    @field_validator("avatar_small_url", "avatar_large_url")
+    @field_validator("avatar_small_url", "avatar_large_url", "avatar_url")
     @classmethod
     def validate_avatar_url(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             clean = v.strip()
-            if clean and not (clean.startswith("http://") or clean.startswith("https://") or clean.startswith("/")):
+            if not clean:
+                return None
+            if not (clean.startswith("http://") or clean.startswith("https://") or clean.startswith("/")):
                 raise ValueError("Avatar URL must be a valid http/https or relative URL")
-            return clean if clean else None
+            return clean
         return None
 
 

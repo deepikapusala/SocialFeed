@@ -95,10 +95,15 @@ class SocialService:
             fields["handle"] = req.handle
         if req.bio is not None:
             fields["bio"] = req.bio
-        if req.avatar_small_url is not None:
-            fields["avatar_small_url"] = req.avatar_small_url
-        if req.avatar_large_url is not None:
-            fields["avatar_large_url"] = req.avatar_large_url
+        if req.avatar_url is not None:
+            clean_url = req.avatar_url.strip() if req.avatar_url else None
+            fields["avatar_small_url"] = clean_url
+            fields["avatar_large_url"] = clean_url
+        else:
+            if req.avatar_small_url is not None:
+                fields["avatar_small_url"] = req.avatar_small_url.strip() if req.avatar_small_url else None
+            if req.avatar_large_url is not None:
+                fields["avatar_large_url"] = req.avatar_large_url.strip() if req.avatar_large_url else None
         if req.is_private is not None:
             fields["is_private"] = req.is_private
 

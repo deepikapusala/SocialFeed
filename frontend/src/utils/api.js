@@ -611,6 +611,8 @@ export async function updateProfileApi(updates) {
       displayName: data.item.displayName,
       handle: data.item.handle,
       bio: data.item.bio,
+      avatar: data.item.avatar || storedUser.avatar,
+      avatarUrl: data.item.avatar?.largeUrl || data.item.avatar?.smallUrl || storedUser.avatarUrl,
     };
     localStorage.setItem('insta_demo_user', JSON.stringify(updatedUser));
   }
