@@ -370,23 +370,6 @@ export function App() {
     setSelectedPost((prev) => (prev && prev.id === postId ? { ...prev, ...updates } : prev));
   }, []);
 
-  const getProfileNiche = (handle) => {
-    switch (handle?.toLowerCase()) {
-      case 'deepu':
-        return 'Food & Culinary feed (12 Posts)';
-      case 'sneha':
-        return 'Flowers & Botanical feed (12 Posts)';
-      case 'asha':
-        return 'Books, Reading & Study feed (12 Posts)';
-      case 'ani':
-        return 'Music & Musical Instruments feed (12 Posts)';
-      case 'virat':
-        return 'Cricket & Sports feed (12 Posts)';
-      default:
-        return 'Personalized Following feed';
-    }
-  };
-
   return (
     <div className="app">
       {/* Top Header Bar: Search on Left, Auth in Middle, Theme Toggle on Right */}
@@ -402,12 +385,11 @@ export function App() {
         onSelectPost={handleSelectPost}
       />
 
-      {/* Personalized feed confirmation banner when logged in */}
+      {/* Feed confirmation banner when logged in */}
       {currentUser && (
         <div className="app__feed-banner" role="status">
-          <span className="app__feed-banner-icon">✨</span>
           <span>
-            Logged in as <strong>@{currentUser.handle}</strong> &mdash; Showing {getProfileNiche(currentUser.handle)}
+            Logged in as <strong>@{currentUser.handle}</strong>
           </span>
         </div>
       )}
