@@ -24,7 +24,12 @@ export function PhotoViewer({
   const hasMedia = totalImages > 0;
 
   const authorId = post.authorId || post.author?.id;
-  const authorHandle = post.username || post.author?.handle || 'user';
+  const authorHandle = post.author?.handle || post.username || 'user';
+  const authorAvatar =
+    post.userAvatar ||
+    post.author?.avatar?.smallUrl ||
+    post.author?.avatar?.largeUrl ||
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
   const activeUser = currentUser || getStoredUser();
   const activeHandle = activeUser?.handle?.toLowerCase();
   const isSelf = Boolean(activeHandle && authorHandle.toLowerCase() === activeHandle);
@@ -73,7 +78,7 @@ export function PhotoViewer({
           if (res?.items?.length > 0) {
             const replyList = res.items.map((r) => ({
               id: r.id,
-              username: r.username || 'user',
+              username: r.author?.handle || r.username || 'user',
               text: r.text || r.caption || '',
             }));
             setComments(replyList);
@@ -253,6 +258,53 @@ export function PhotoViewer({
   const wasInitiallyReposted = Boolean(post.repostedByViewer);
   const currentReposts = initialReposts + (isReposted ? (wasInitiallyReposted ? 0 : 1) : (wasInitiallyReposted ? -1 : 0));
 
+  // Determine likers for authentic Instagram "Liked by @handle" line
+  const likerList = (Array.isArray(post.likerHandles) && post.likerHandles.length > 0)
+    ? post.likerHandles
+    : (Array.isArray(post.likers) && post.likers.length > 0)
+    ? post.likers
+    : (post.topLiker?.handle ? [post.topLiker.handle] : []);
+
+  const primaryLiker = likerList[0];
+
+  const renderLikesText = () => {
+    if (currentLikes <= 0) {
+      return <strong>0 likes</strong>;
+    }
+
+    if (primaryLiker) {
+      if (primaryLiker.toLowerCase() === activeHandle) {
+        if (currentLikes === 1) {
+          return <>Liked by <strong>you</strong></>;
+        } else if (currentLikes === 2) {
+          return <>Liked by <strong>you</strong> and <strong>1 other</strong></>;
+        } else {
+          return <>Liked by <strong>you</strong> and <strong>{(currentLikes - 1).toLocaleString()} others</strong></>;
+        }
+      }
+
+      if (currentLikes === 1) {
+        return <>Liked by <strong>@{primaryLiker}</strong></>;
+      } else if (currentLikes === 2) {
+        if (isLiked) {
+          return <>Liked by <strong>@{primaryLiker}</strong> and <strong>you</strong></>;
+        }
+        return <>Liked by <strong>@{primaryLiker}</strong> and <strong>1 other</strong></>;
+      } else {
+        if (isLiked) {
+          return <>Liked by <strong>@{primaryLiker}</strong>, <strong>you</strong> and <strong>{(currentLikes - 2).toLocaleString()} others</strong></>;
+        }
+        return <>Liked by <strong>@{primaryLiker}</strong> and <strong>{(currentLikes - 1).toLocaleString()} others</strong></>;
+      }
+    }
+
+    if (isLiked && currentLikes === 1) {
+      return <>Liked by <strong>you</strong></>;
+    }
+
+    return <strong>{currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}</strong>;
+  };
+
   return (
     <div
       className="post-modal"
@@ -274,7 +326,7 @@ export function PhotoViewer({
           <div className="post-modal__user-info">
             <img
               className="post-modal__avatar"
-              src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80'}
+              src={authorAvatar}
               alt={authorHandle}
             />
             <div className="post-modal__user-meta">
@@ -443,17 +495,22 @@ export function PhotoViewer({
 
         {/* Post Details (Likes, Reposts, Caption, Comments, Time) */}
         <div className="post-modal__body">
-          <p className="post-modal__likes">
-            <strong>{currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}</strong>
-            {currentReposts > 0 && (
-              <span className="post-modal__reposts-count" style={{ marginLeft: '12px', color: 'var(--color-text-secondary)' }}>
-                • <strong>{currentReposts.toLocaleString()} {currentReposts === 1 ? 'repost' : 'reposts'}</strong>
-              </span>
+          <div className="post-modal__likes-row" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {primaryLiker && currentLikes > 0 && (
+              <span style={{ fontSize: '0.85rem' }} aria-hidden="true">❤️</span>
             )}
-          </p>
+            <p className="post-modal__likes">
+              {renderLikesText()}
+              {currentReposts > 0 && (
+                <span className="post-modal__reposts-count" style={{ marginLeft: '12px', color: 'var(--color-text-secondary)' }}>
+                  • <strong>{currentReposts.toLocaleString()} {currentReposts === 1 ? 'repost' : 'reposts'}</strong>
+                </span>
+              )}
+            </p>
+          </div>
 
           <p className="post-modal__caption">
-            <strong className="post-modal__caption-username">{post.username || 'instagram_user'} </strong>
+            <strong className="post-modal__caption-username">@{authorHandle} </strong>
             <span className="post-modal__caption-text">{post.caption || post.text || ''}</span>
           </p>
 

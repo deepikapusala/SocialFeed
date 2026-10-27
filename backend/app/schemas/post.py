@@ -32,6 +32,7 @@ class PostItem(CamelModel):
     repost_of_id: Optional[str] = None
     updated_at: Optional[datetime] = None
     version: Optional[int] = 1
+    liker_handles: List[str] = []
 
 
 class PostDetailResponse(CamelModel):

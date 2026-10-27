@@ -179,6 +179,7 @@ export function normalizePostItem(item) {
     alt: mediaList[0]?.altText || item.alt || item.text || 'Instagram post',
     likes: item.likeCount ?? item.likes ?? 0,
     likeCount: item.likeCount ?? item.likes ?? 0,
+    likerHandles: item.likerHandles || item.likers || [],
     comments: item.comments ?? item.replyCount ?? 0,
     replyCount: item.comments ?? item.replyCount ?? 0,
     repostCount: item.repostCount ?? 0,
@@ -186,6 +187,8 @@ export function normalizePostItem(item) {
     followedByViewer: Boolean(item.author?.followedByViewer ?? item.followedByViewer ?? false),
     likedByViewer: item.likedByViewer ?? false,
     repostedByViewer: Boolean(item.repostedByViewer ?? false),
+    replyToId: item.replyToId || null,
+    repostOfId: item.repostOfId || null,
     createdAt: item.createdAt,
     timeAgo: item.timeAgo || formatTimestamp(item.createdAt),
   };
@@ -401,6 +404,7 @@ export async function fetchPostDetailApi(postId) {
   const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
     method: 'GET',
     headers: {
+      ...getAuthHeaders(),
       'Accept': 'application/json',
     },
   });

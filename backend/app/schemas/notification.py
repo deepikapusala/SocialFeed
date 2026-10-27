@@ -15,6 +15,7 @@ class NotificationTargetPost(CamelModel):
     kind: Optional[str] = None
     text: Optional[str] = None
     is_deleted: bool = False
+    reply_to_id: Optional[str] = None
 
 
 class NotificationItem(CamelModel):

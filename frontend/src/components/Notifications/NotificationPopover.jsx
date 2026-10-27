@@ -123,7 +123,18 @@ export function NotificationPopover({ currentUser, onOpenAuth, onSelectPost }) {
     }
 
     if (notif.targetPost && notif.targetPost.id && onSelectPost) {
-      onSelectPost(notif.targetPost);
+      // If it is a reply (comment) notification, open the parent post that was commented on!
+      const targetPostId =
+        notif.eventType === 'reply' && notif.targetPost.replyToId
+          ? notif.targetPost.replyToId
+          : notif.targetPost.id;
+
+      onSelectPost(targetPostId, {
+        notification: notif,
+        actor: notif.actor,
+        eventType: notif.eventType,
+        targetPost: notif.targetPost,
+      });
       setIsOpen(false);
     }
   };

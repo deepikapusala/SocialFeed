@@ -76,17 +76,63 @@ export function App() {
   };
 
   /**
-   * Handle selecting a post and updating URL to /p/:postId
+   * Handle selecting a post and updating URL to /p/:postId.
+   * Gracefully handles:
+   * - Full post objects from clicking photo cards in feed
+   * - Post IDs or notification items from clicking notifications or URL deep links
+   * - Automatically resolves comments/replies to their parent post
+   * - Enriches post with liker actor handle when clicked from like notification
    */
-  const handleSelectPost = useCallback((post) => {
-    setSelectedPost(post);
-    if (post && post.id) {
-      const targetUrl = `/p/${post.id}`;
-      if (window.location.pathname !== targetUrl) {
-        window.history.pushState({ postId: post.id }, '', targetUrl);
+  const handleSelectPost = useCallback(async (postOrId, context = {}) => {
+    if (!postOrId) return;
+
+    let targetId = typeof postOrId === 'string' ? postOrId : postOrId.id;
+    let postObj = typeof postOrId === 'object' ? { ...postOrId } : null;
+
+    // If given post is a reply stub, resolve to parent post ID
+    if (postObj?.kind === 'reply' && postObj.replyToId) {
+      targetId = postObj.replyToId;
+      postObj = null;
+    }
+
+    // 1. Look for existing full post in feed state
+    let matchedPost = posts.find((p) => p.id === targetId);
+
+    // 2. If not found or if the post is incomplete (missing images/media or author), fetch from backend
+    if (!matchedPost || !matchedPost.images || matchedPost.images.length === 0 || !matchedPost.author) {
+      try {
+        const fetched = await fetchPostDetailApi(targetId);
+        if (fetched) {
+          // If fetched post is a reply, load its parent post
+          if (fetched.kind === 'reply' && fetched.replyToId) {
+            matchedPost = await fetchPostDetailApi(fetched.replyToId);
+          } else {
+            matchedPost = fetched;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch post detail:', err);
       }
     }
-  }, []);
+
+    const finalPost = matchedPost || postObj;
+    if (finalPost) {
+      // Enrich with liker information if this came from a like notification
+      if (context.eventType === 'like' && context.actor?.handle) {
+        const existingLikers = finalPost.likerHandles || [];
+        if (!existingLikers.includes(context.actor.handle)) {
+          finalPost.likerHandles = [context.actor.handle, ...existingLikers];
+        }
+        finalPost.topLiker = context.actor;
+      }
+      setSelectedPost(finalPost);
+
+      const targetUrl = `/p/${finalPost.id}`;
+      if (window.location.pathname !== targetUrl) {
+        window.history.pushState({ postId: finalPost.id }, '', targetUrl);
+      }
+    }
+  }, [posts]);
 
   /**
    * Handle closing post modal and reverting URL to /

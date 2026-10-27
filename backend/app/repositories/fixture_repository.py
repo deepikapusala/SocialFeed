@@ -131,6 +131,11 @@ class FixtureRepository:
             "repostedByViewer": self._is_reposted_by_viewer(post_id, viewer_id),
             "replyToId": post_raw.get("replyToId"),
             "repostOfId": post_raw.get("repostOfId"),
+            "likerHandles": [
+                self._find_user(lk["userId"])["handle"]
+                for lk in self._likes
+                if lk["postId"] == post_id and self._find_user(lk["userId"])
+            ][:3],
         }
 
     @staticmethod

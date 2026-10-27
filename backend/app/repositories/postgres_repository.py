@@ -8,6 +8,7 @@ Reference: docs/05_Python_Database_Integration_PRD.md
 
 import inspect
 import uuid
+from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import (
@@ -81,6 +82,7 @@ class PostgresRepository:
         reposted_by_viewer: bool = False,
         referenced_author_handle: Optional[str] = None,
         referenced_text: Optional[str] = None,
+        liker_handles: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         media_list = []
         if post.kind == "original" and post.media:
@@ -114,6 +116,7 @@ class PostgresRepository:
             "repostOfId": str(post.repost_of_id) if post.repost_of_id else None,
             "updatedAt": post.updated_at.isoformat().replace("+00:00", "Z") if getattr(post, "updated_at", None) else None,
             "version": getattr(post, "version", 1),
+            "likerHandles": liker_handles or [],
         }
 
         if post.kind == "repost" and referenced_author_handle is not None:
@@ -272,6 +275,20 @@ class PostgresRepository:
         result = await self._session.execute(stmt)
         rows = result.all()
 
+        post_ids = [row[0].id for row in rows]
+        liker_map = defaultdict(list)
+        if post_ids:
+            likers_stmt = (
+                select(PostLike.post_id, User.handle)
+                .join(User, PostLike.user_id == User.id)
+                .where(PostLike.post_id.in_(post_ids))
+                .order_by(PostLike.created_at.desc())
+            )
+            likers_res = await self._session.execute(likers_stmt)
+            for pid, handle in likers_res.all():
+                if len(liker_map[pid]) < 3:
+                    liker_map[pid].append(handle)
+
         return [
             self._assemble_post_dict(
                 post=row[0],
@@ -281,6 +298,7 @@ class PostgresRepository:
                 followed_by_viewer=bool(row[4]),
                 repost_count=row[5] or 0,
                 reposted_by_viewer=bool(row[6]),
+                liker_handles=liker_map.get(row[0].id, []),
             )
             for row in rows
         ]
@@ -392,6 +410,17 @@ class PostgresRepository:
                 ref_text = ref_row[0].text
                 ref_handle = ref_row[1]
 
+        # Fetch top liker handles for this post
+        likers_stmt = (
+            select(User.handle)
+            .join(PostLike, PostLike.user_id == User.id)
+            .where(PostLike.post_id == post_uuid)
+            .order_by(PostLike.created_at.desc())
+            .limit(3)
+        )
+        likers_res = await self._session.execute(likers_stmt)
+        liker_handles = [row[0] for row in likers_res.all()]
+
         return self._assemble_post_dict(
             post=post,
             like_count=like_cnt,
@@ -402,6 +431,7 @@ class PostgresRepository:
             reposted_by_viewer=reposted,
             referenced_author_handle=ref_handle,
             referenced_text=ref_text,
+            liker_handles=liker_handles,
         )
 
     async def get_user_profile(
@@ -1620,6 +1650,7 @@ class PostgresRepository:
                         "kind": n.target_post.kind if not is_del else None,
                         "text": n.target_post.text if not is_del else "[Deleted]",
                         "isDeleted": is_del,
+                        "replyToId": str(n.target_post.reply_to_id) if n.target_post.reply_to_id else None,
                     }
                 else:
                     target_post_data = {
@@ -1627,6 +1658,7 @@ class PostgresRepository:
                         "kind": None,
                         "text": "[Deleted]",
                         "isDeleted": True,
+                        "replyToId": None,
                     }
 
             results.append({
