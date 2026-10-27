@@ -488,32 +488,69 @@ export async function markSingleNotificationReadApi(notificationId) {
 }
 
 /**
- * Searches original posts across all profiles by keyword, hashtag (#), or author handle.
+ * Searches original posts across all profiles by caption, hashtags (#), author handle (@), display name, or bio.
  *
- * @param {string} query - Search string (e.g. '#waffles', 'waffles', '#cricket', 'flowers').
+ * @param {string} query - Search string (e.g. '#waffles', 'waffles', '#cricket', 'flowers', 'gourmet', 'deepu').
  * @param {number} limit - Maximum number of posts to fetch (defaults to 60).
  * @returns {Promise<Array>} Normalized post items.
  */
 export async function searchPostsApi(query, limit = 60) {
   if (!query || !query.trim()) return [];
   const cleanQ = query.trim();
+
+  // FastAPI backend requires limit between 1 and 50 per request
+  const fetchLimit = Math.min(Math.max(1, limit), 50);
   const url = new URL(`${API_BASE_URL}/search/posts`);
   url.searchParams.set('q', cleanQ);
-  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('limit', String(fetchLimit));
 
-  const response = await fetch(url.toString(), {
-    method: 'GET',
-    headers: {
-      ...getAuthHeaders(),
-      'Accept': 'application/json',
-    },
-  });
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        ...getAuthHeaders(),
+        'Accept': 'application/json',
+      },
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      console.warn(`Search API returned status ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    let allItems = (data.items || []).map(normalizePostItem);
+
+    // If caller requested more than 50 (e.g. 60) and more items exist, fetch second page
+    if (limit > 50 && data.hasMore && data.nextCursor) {
+      try {
+        const page2Url = new URL(`${API_BASE_URL}/search/posts`);
+        page2Url.searchParams.set('q', cleanQ);
+        page2Url.searchParams.set('limit', String(Math.min(limit - 50, 50)));
+        page2Url.searchParams.set('cursor', data.nextCursor);
+
+        const res2 = await fetch(page2Url.toString(), {
+          method: 'GET',
+          headers: {
+            ...getAuthHeaders(),
+            'Accept': 'application/json',
+          },
+        });
+        if (res2.ok) {
+          const data2 = await res2.json();
+          const items2 = (data2.items || []).map(normalizePostItem);
+          allItems = [...allItems, ...items2];
+        }
+      } catch (err2) {
+        console.warn('Failed to fetch subsequent search page:', err2);
+      }
+    }
+
+    return allItems;
+  } catch (err) {
+    console.error('Search API request failed:', err);
     return [];
   }
-
-  const data = await response.json();
-  return (data.items || []).map(normalizePostItem);
 }
+
 

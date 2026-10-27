@@ -63,6 +63,7 @@ export function SuggestedProfiles({
   onOpenAuth,
   onToggleFollow,
   followingMap = {},
+  onSelectProfile,
 }) {
   const currentHandle = currentUser?.handle?.toLowerCase();
 
@@ -101,8 +102,16 @@ export function SuggestedProfiles({
             }
             alt={currentUser.handle}
             className="suggested-sidebar__my-avatar"
+            onClick={() => onSelectProfile && onSelectProfile(currentUser.handle)}
+            style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
+            title={`View posts by @${currentUser.handle}`}
           />
-          <div className="suggested-sidebar__my-info">
+          <div
+            className="suggested-sidebar__my-info"
+            onClick={() => onSelectProfile && onSelectProfile(currentUser.handle)}
+            style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
+            title={`View posts by @${currentUser.handle}`}
+          >
             <span className="suggested-sidebar__my-name">
               {currentUser.displayName || currentUser.handle}
             </span>
@@ -147,7 +156,12 @@ export function SuggestedProfiles({
 
           return (
             <div key={p.handle} className="suggested-profile-card" role="listitem">
-              <div className="suggested-profile-card__avatar-wrapper">
+              <div
+                className="suggested-profile-card__avatar-wrapper"
+                onClick={() => onSelectProfile && onSelectProfile(p.handle)}
+                style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
+                title={`View posts by @${p.handle}`}
+              >
                 <img
                   src={p.avatar}
                   alt={`${p.displayName} (@${p.handle})`}
@@ -156,7 +170,12 @@ export function SuggestedProfiles({
                 />
               </div>
 
-              <div className="suggested-profile-card__content">
+              <div
+                className="suggested-profile-card__content"
+                onClick={() => onSelectProfile && onSelectProfile(p.handle)}
+                style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
+                title={`View posts by @${p.handle}`}
+              >
                 <div className="suggested-profile-card__names">
                   <span className="suggested-profile-card__name">{p.displayName}</span>
                   <span className="suggested-profile-card__handle">@{p.handle}</span>

@@ -9,7 +9,7 @@ import './PhotoCard.css';
  * with a multi-photo carousel badge if applicable, or a clean typography card
  * if the post has no media attachments.
  */
-export function PhotoCard({ post, index, onSelectPost, onToggleFollow }) {
+export function PhotoCard({ post, index, onSelectPost, onToggleFollow, onSelectAuthor }) {
   const images = Array.isArray(post.images)
     ? post.images
     : (post.imageUrl ? [post.imageUrl] : []);
@@ -37,6 +37,14 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow }) {
     }
   };
 
+  const handleAuthorClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onSelectAuthor) {
+      onSelectAuthor(authorHandle);
+    }
+  };
+
   return (
     <article className={`photo-card ${!hasImages ? 'photo-card--text' : ''}`}>
       <button
@@ -59,7 +67,12 @@ export function PhotoCard({ post, index, onSelectPost, onToggleFollow }) {
 
             {/* Top Bar Header Overlay */}
             <div className="photo-card__top-overlay" onClick={(e) => e.stopPropagation()}>
-              <div className="photo-card__author-info">
+              <div
+                className="photo-card__author-info"
+                onClick={handleAuthorClick}
+                style={{ cursor: onSelectAuthor ? 'pointer' : 'default' }}
+                title={`Filter posts by @${authorHandle}`}
+              >
                 <img
                   className="photo-card__author-avatar"
                   src={post.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}

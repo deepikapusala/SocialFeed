@@ -337,13 +337,35 @@ export function App() {
   };
 
   // -------------------------------------------------------------
+  // -------------------------------------------------------------
   // Live global search: queries backend across all 60 posts from all 5 profiles
-  // Supports '#waffles', '#cricket', '#flowers', '#music', '#books', etc.
+  // Supports captions, hashtags (#), usernames (@handle, name), and bio keywords!
+  // Works identically everywhere: default guest page + when logged in as any profile.
   // -------------------------------------------------------------
   useEffect(() => {
     const trimmed = searchQuery.trim();
     if (!trimmed) {
       setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
+
+    // If query is 1 character, do fast local filter on loaded posts
+    if (trimmed.length < 2) {
+      const lower = trimmed.toLowerCase();
+      const localMatches = posts.filter((p) => {
+        const caption = (p.caption || p.text || '').toLowerCase();
+        const handle = (p.username || p.author?.handle || '').toLowerCase();
+        const name = (p.author?.displayName || p.displayName || '').toLowerCase();
+        const bio = (p.author?.bio || '').toLowerCase();
+        return (
+          caption.includes(lower) ||
+          handle.includes(lower) ||
+          name.includes(lower) ||
+          bio.includes(lower)
+        );
+      });
+      setSearchResults(localMatches);
       setIsSearching(false);
       return;
     }
@@ -362,7 +384,7 @@ export function App() {
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, posts]);
 
   const isSearchActive = Boolean(searchQuery.trim());
   const filteredPosts = isSearchActive
@@ -420,7 +442,7 @@ export function App() {
             <div className="app__empty-search">
               <p className="app__empty-title">No posts found for "{searchQuery}"</p>
               <p className="app__empty-subtitle">
-                Try searching by tag (e.g. #waffles, #flowers, #cricket, #books, #music), caption keyword, or handle...
+                Try searching any word from caption, username (@deepu, @sneha, etc.), or bio (e.g. gourmet, flora, books, cricket, acoustic)...
               </p>
               <button
                 type="button"
@@ -441,6 +463,7 @@ export function App() {
               onLoadMore={() => loadPosts(false)}
               hasMore={isSearchActive ? false : hasMore}
               loading={loading}
+              onSelectAuthor={(handle) => setSearchQuery(`@${handle}`)}
             />
           )}
 
@@ -464,6 +487,7 @@ export function App() {
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onToggleFollow={handleToggleFollow}
             followingMap={followingMap}
+            onSelectProfile={(handle) => setSearchQuery(`@${handle}`)}
           />
         </aside>
       </div>

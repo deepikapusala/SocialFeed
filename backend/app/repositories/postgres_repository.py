@@ -7,6 +7,7 @@ Reference: docs/05_Python_Database_Integration_PRD.md
 """
 
 import inspect
+import re
 import uuid
 from collections import defaultdict
 from datetime import datetime
@@ -677,11 +678,49 @@ class PostgresRepository:
             ).scalar_subquery()
         )
 
-        search_filter = or_(
+        tokens = [
+            t.strip().lstrip("#").lstrip("@")
+            for t in re.split(r"[\s,+#@]+", clean_query)
+            if len(t.strip().lstrip("#").lstrip("@")) >= 2
+        ]
+
+        search_conditions = [
             Post.text.ilike(f"%{clean_query}%"),
-            Post.text.ilike(f"%{raw_term}%"),
-            User.handle.ilike(f"%{raw_term}%"),
-            User.display_name.ilike(f"%{raw_term}%"),
+            User.handle.ilike(f"%{clean_query}%"),
+            User.display_name.ilike(f"%{clean_query}%"),
+            User.bio.ilike(f"%{clean_query}%"),
+        ]
+        if raw_term:
+            search_conditions.extend([
+                Post.text.ilike(f"%{raw_term}%"),
+                User.handle.ilike(f"%{raw_term}%"),
+                User.display_name.ilike(f"%{raw_term}%"),
+                User.bio.ilike(f"%{raw_term}%"),
+            ])
+        for t in tokens:
+            if t and t != raw_term and t != clean_query:
+                search_conditions.extend([
+                    Post.text.ilike(f"%{t}%"),
+                    User.handle.ilike(f"%{t}%"),
+                    User.display_name.ilike(f"%{t}%"),
+                    User.bio.ilike(f"%{t}%"),
+                ])
+
+        search_filter = or_(*search_conditions)
+
+        followed_by_viewer_sq = (
+            select(
+                exists(
+                    select(1)
+                    .where(
+                        and_(
+                            Follow.follower_id == viewer_uuid,
+                            Follow.following_id == Post.author_id,
+                        )
+                    )
+                    .correlate(Post)
+                )
+            ).scalar_subquery()
         )
 
         stmt = (
@@ -690,6 +729,7 @@ class PostgresRepository:
                 like_count_sq.label("like_count"),
                 reply_count_sq.label("reply_count"),
                 liked_by_viewer_sq.label("liked_by_viewer"),
+                followed_by_viewer_sq.label("followed_by_viewer"),
             )
             .join(Post.author)
             .options(
@@ -731,6 +771,7 @@ class PostgresRepository:
                 like_count=row[1] or 0,
                 reply_count=row[2] or 0,
                 liked_by_viewer=bool(row[3]),
+                followed_by_viewer=bool(row[4]),
                 liker_handles=liker_map.get(row[0].id, []),
             )
             for row in rows

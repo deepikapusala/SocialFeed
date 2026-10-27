@@ -429,14 +429,36 @@ class FixtureRepository:
         viewer_id: str,
     ) -> List[Dict[str, Any]]:
         await self._simulate_io()
+        import re
         clean_query = query.strip().lower()
         raw_term = clean_query.lstrip("#").lstrip("@")
-
-        # Case-insensitive literal substring match on original post text (both with and without leading #)
-        matches = [
-            p for p in self._originals
-            if p.get("text") and (clean_query in p["text"].lower() or raw_term in p["text"].lower())
+        tokens = [
+            t.strip().lstrip("#").lstrip("@")
+            for t in re.split(r"[\s,+#@]+", clean_query)
+            if len(t.strip().lstrip("#").lstrip("@")) >= 2
         ]
+
+        def post_matches(p: Dict[str, Any]) -> bool:
+            text = (p.get("text") or "").lower()
+            author = self._find_user(p.get("authorId")) or {}
+            handle = (author.get("handle") or "").lower()
+            display_name = (author.get("displayName") or author.get("display_name") or "").lower()
+            bio = (author.get("bio") or "").lower()
+
+            search_targets = [text, handle, display_name, bio]
+
+            for target in search_targets:
+                if clean_query in target or (raw_term and raw_term in target):
+                    return True
+
+            for t in tokens:
+                for target in search_targets:
+                    if t in target:
+                        return True
+
+            return False
+
+        matches = [p for p in self._originals if post_matches(p)]
         matches.sort(key=lambda p: (p["createdAt"], p["id"]), reverse=True)
 
         filtered = [

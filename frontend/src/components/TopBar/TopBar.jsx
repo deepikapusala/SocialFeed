@@ -43,11 +43,11 @@ export function TopBar({
           <input
             type="text"
             className="topbar__search-input"
-            placeholder="Search tags (e.g. #art, #nature, #coffee)..."
+            placeholder="Search caption, username (@deepu), or bio..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            aria-label="Search posts by tag or caption"
+            aria-label="Search posts by caption, username, or bio"
             autoComplete="off"
           />
           {searchQuery && (
