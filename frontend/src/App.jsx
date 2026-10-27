@@ -13,6 +13,7 @@ import {
   getStoredUser,
   logoutApi,
   searchPostsApi,
+  fetchCurrentUserApi,
 } from './utils/api';
 import './App.css';
 
@@ -458,6 +459,17 @@ export function App() {
       return prev;
     });
   }, []);
+
+  // Synchronize currentUser profile directly from PostgreSQL database on initial load/refresh
+  useEffect(() => {
+    fetchCurrentUserApi()
+      .then((freshUser) => {
+        if (freshUser) {
+          handleProfileUpdated(freshUser);
+        }
+      })
+      .catch(() => {});
+  }, [handleProfileUpdated]);
 
   const handleUpdatePost = useCallback((postId, updates) => {
     setPosts((prev) =>

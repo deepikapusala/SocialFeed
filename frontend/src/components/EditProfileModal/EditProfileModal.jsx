@@ -175,13 +175,28 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
               className="edit-profile-input"
               value={avatarUrl}
               onChange={(e) => {
-                setAvatarUrl(e.target.value);
+                let val = e.target.value.trim();
+                if (val.includes('images.unsplash.com') && !val.includes('auto=format')) {
+                  const base = val.split('?')[0].split('&')[0];
+                  val = `${base}?auto=format&fit=crop&w=150&q=80`;
+                }
+                setAvatarUrl(val);
                 setImageLoadError(false);
               }}
               placeholder="Paste Unsplash URL (e.g. https://images.unsplash.com/...)"
             />
+
+            {avatarUrl.includes('unsplash.com/photos/') && (
+              <div className="edit-profile-url-notice">
+                <span className="edit-profile-url-notice__icon">✨</span>
+                <span>
+                  <strong>Unsplash photo page link detected!</strong> When you click &quot;Save Changes&quot;, our backend automatically resolves this page link to the high-res image and formats it with <code>?auto=format&fit=crop&w=150&q=80</code> in the database!
+                </span>
+              </div>
+            )}
+
             <span className="edit-profile-hint">
-              Paste an Unsplash image link to update your avatar. Shows instant live preview above!
+              Paste any image link to update your avatar. (Tip: On Unsplash, right-click the photo and select &quot;Copy Image Address&quot; for the direct image link!)
             </span>
 
             {/* Quick Sample Avatars */}

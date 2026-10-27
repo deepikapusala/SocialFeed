@@ -603,7 +603,7 @@ export async function updateProfileApi(updates) {
     throw new Error(msg);
   }
 
-  // Update locally stored user data to reflect changes
+  // Update locally stored user data to reflect changes across all storage keys
   const storedUser = getStoredUser();
   if (storedUser && data.item) {
     const updatedUser = {
@@ -614,11 +614,48 @@ export async function updateProfileApi(updates) {
       avatar: data.item.avatar || storedUser.avatar,
       avatarUrl: data.item.avatar?.largeUrl || data.item.avatar?.smallUrl || storedUser.avatarUrl,
     };
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
     localStorage.setItem('insta_demo_user', JSON.stringify(updatedUser));
   }
 
   return data.item;
 }
+
+/**
+ * Fetches the currently authenticated user's profile directly from GET /users/me.
+ * Synchronizes the local session storage so database updates persist seamlessly across reloads.
+ *
+ * @returns {Promise<Object|null>}
+ */
+export async function fetchCurrentUserApi() {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/users/me`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        ...getAuthHeaders(),
+      },
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data?.item) {
+      const user = {
+        ...data.item,
+        avatarUrl: data.item.avatar?.largeUrl || data.item.avatar?.smallUrl || null,
+      };
+      setAuthSession(token, user);
+      return user;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch current user session from /users/me:', err);
+  }
+  return null;
+}
+
 
 /**
  * Creates a new original post via POST /posts on FastAPI backend.

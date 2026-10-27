@@ -81,15 +81,32 @@ export function TopBar({
 
           {currentUser ? (
             <div className="topbar__user-chip">
-              <img
-                src={
-                  currentUser.avatar?.smallUrl ||
-                  currentUser.avatar?.largeUrl ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
-                }
-                alt={currentUser.handle}
-                className="topbar__user-avatar"
-              />
+              {currentUser.avatar?.smallUrl || currentUser.avatar?.largeUrl || currentUser.avatarUrl ? (
+                <img
+                  src={
+                    currentUser.avatar?.smallUrl ||
+                    currentUser.avatar?.largeUrl ||
+                    currentUser.avatarUrl
+                  }
+                  alt={currentUser.handle}
+                  className="topbar__user-avatar"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div
+                className="topbar__user-avatar-fallback"
+                style={{
+                  display:
+                    currentUser.avatar?.smallUrl || currentUser.avatar?.largeUrl || currentUser.avatarUrl
+                      ? 'none'
+                      : 'flex',
+                }}
+              >
+                {(currentUser.displayName || currentUser.handle || 'U').charAt(0).toUpperCase()}
+              </div>
               <div className="topbar__user-meta">
                 <span className="topbar__user-handle">@{currentUser.handle}</span>
                 <button

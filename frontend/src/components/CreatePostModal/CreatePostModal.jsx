@@ -143,9 +143,15 @@ export function CreatePostModal({ isOpen, onClose, currentUser, onPostCreated })
       return;
     }
 
+    let finalUrl = cleanUrl;
+    if (finalUrl.includes('images.unsplash.com') && !finalUrl.includes('auto=format')) {
+      const base = finalUrl.split('?')[0].split('&')[0];
+      finalUrl = `${base}?auto=format&fit=crop&w=1080&q=80`;
+    }
+
     const newImg = {
       id: `url-${Date.now()}`,
-      url: cleanUrl,
+      url: finalUrl,
       width: 1080,
       height: 1080,
       altText: altTextInput.trim() || 'Instagram photo',

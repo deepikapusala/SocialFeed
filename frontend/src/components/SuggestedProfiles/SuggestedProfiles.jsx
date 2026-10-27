@@ -65,16 +65,40 @@ export function SuggestedProfiles({
   followingMap = {},
   onSelectProfile,
 }) {
+  const [coreProfiles, setCoreProfiles] = useState(ALL_PROFILES);
   const [communityUsers, setCommunityUsers] = useState([]);
   const [showMore, setShowMore] = useState(false);
 
   const currentHandle = currentUser?.handle?.toLowerCase();
 
-  // Fetch registered users from PostgreSQL to discover community accounts (like @vivek)
+  // Fetch registered users from PostgreSQL to discover community accounts & sync core creators
   useEffect(() => {
     fetchUsersApi()
       .then((res) => {
         if (res?.items?.length > 0) {
+          const itemsMap = new Map();
+          res.items.forEach((u) => {
+            itemsMap.set(u.handle.toLowerCase(), u);
+          });
+
+          // Sync core profiles with live database data (avatar, displayName, bio)
+          setCoreProfiles((prev) =>
+            prev.map((core) => {
+              const live = itemsMap.get(core.handle.toLowerCase());
+              if (!live) return core;
+              return {
+                ...core,
+                displayName: live.displayName || core.displayName,
+                bio: live.bio !== undefined && live.bio !== null && live.bio !== '' ? live.bio : core.bio,
+                avatar:
+                  live.avatar?.smallUrl ||
+                  live.avatar?.largeUrl ||
+                  live.avatarUrl ||
+                  (typeof live.avatar === 'string' ? live.avatar : core.avatar),
+              };
+            })
+          );
+
           const coreHandles = new Set(ALL_PROFILES.map((p) => p.handle.toLowerCase()));
           const community = res.items
             .filter((u) => !coreHandles.has(u.handle.toLowerCase()))
@@ -83,6 +107,7 @@ export function SuggestedProfiles({
               handle: u.handle,
               displayName: u.displayName || u.handle,
               bio: u.bio || 'New Community Creator',
+              badge: 'Community 🌟',
               avatar:
                 u.avatar?.smallUrl ||
                 u.avatar?.largeUrl ||
@@ -96,7 +121,7 @@ export function SuggestedProfiles({
   }, [currentUser]);
 
   // Filter core profiles: exclude current user if logged in
-  const visibleCoreProfiles = ALL_PROFILES.filter(
+  const visibleCoreProfiles = coreProfiles.filter(
     (p) => !currentHandle || p.handle.toLowerCase() !== currentHandle
   );
 

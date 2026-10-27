@@ -69,6 +69,60 @@ class SocialService:
 
         return UserProfileResponse(item=UserProfile(**raw_user))
 
+    @staticmethod
+    async def _resolve_avatar_url(raw_url: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+        """
+        Normalizes avatar image URLs.
+        If an Unsplash link is provided:
+        - If it's a direct CDN URL (images.unsplash.com), formats it with ?auto=format&fit=crop&w=150&q=80
+        - If it's an Unsplash webpage URL (unsplash.com/photos/...), resolves the underlying og:image CDN URL
+        Returns a tuple of (small_url, large_url).
+        """
+        if not raw_url:
+            return None, None
+        clean = raw_url.strip()
+        if not clean:
+            return None, None
+
+        if "unsplash.com" in clean:
+            # Direct CDN link: https://images.unsplash.com/photo-...
+            if "images.unsplash.com" in clean:
+                base = clean.split("?")[0].split("&")[0]
+                small = f"{base}?auto=format&fit=crop&w=150&q=80"
+                large = f"{base}?auto=format&fit=crop&w=400&q=80"
+                return small, large
+
+            # Webpage link: https://unsplash.com/photos/...
+            if "unsplash.com/photos/" in clean:
+                try:
+                    import httpx
+                    import re
+                    async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as client:
+                        resp = await client.get(
+                            clean,
+                            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                        )
+                        if resp.status_code == 200:
+                            m = re.search(r'<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\']', resp.text)
+                            if m:
+                                og_base = m.group(1).split("?")[0].split("&")[0]
+                                return f"{og_base}?auto=format&fit=crop&w=150&q=80", f"{og_base}?auto=format&fit=crop&w=400&q=80"
+                except Exception:
+                    pass
+
+                # If query failed, check if slug contains photo-ID
+                import re
+                p_match = re.search(r"(photo-[a-zA-Z0-9_-]+)", clean)
+                if p_match:
+                    pid = p_match.group(1)
+                    return f"https://images.unsplash.com/{pid}?auto=format&fit=crop&w=150&q=80", f"https://images.unsplash.com/{pid}?auto=format&fit=crop&w=400&q=80"
+
+            # Generic unsplash URL
+            if "?" not in clean:
+                return f"{clean}?auto=format&fit=crop&w=150&q=80", f"{clean}?auto=format&fit=crop&w=400&q=80"
+
+        return clean, clean
+
     async def update_profile(
         self,
         actor_id: str,
@@ -95,15 +149,19 @@ class SocialService:
             fields["handle"] = req.handle
         if req.bio is not None:
             fields["bio"] = req.bio
+
         if req.avatar_url is not None:
-            clean_url = req.avatar_url.strip() if req.avatar_url else None
-            fields["avatar_small_url"] = clean_url
-            fields["avatar_large_url"] = clean_url
+            sm, lg = await self._resolve_avatar_url(req.avatar_url)
+            fields["avatar_small_url"] = sm
+            fields["avatar_large_url"] = lg
         else:
             if req.avatar_small_url is not None:
-                fields["avatar_small_url"] = req.avatar_small_url.strip() if req.avatar_small_url else None
+                sm, _ = await self._resolve_avatar_url(req.avatar_small_url)
+                fields["avatar_small_url"] = sm
             if req.avatar_large_url is not None:
-                fields["avatar_large_url"] = req.avatar_large_url.strip() if req.avatar_large_url else None
+                _, lg = await self._resolve_avatar_url(req.avatar_large_url)
+                fields["avatar_large_url"] = lg
+
         if req.is_private is not None:
             fields["is_private"] = req.is_private
 

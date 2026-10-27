@@ -74,6 +74,18 @@ async def list_all_users(
 
 
 
+@router.get("/users/me", response_model=UserProfileResponse)
+async def get_my_profile(
+    actor: User = Depends(get_required_actor),
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+) -> UserProfileResponse:
+    """
+    Retrieve authenticated caller's own full profile directly from database.
+    """
+    service = SocialService(repo)
+    return await service.get_user_profile(user_id=str(actor.id), viewer_id=str(actor.id))
+
+
 @router.get("/users/{id}", response_model=UserProfileResponse)
 async def get_user_profile(
     id: str,
