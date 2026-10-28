@@ -359,14 +359,21 @@ export function App() {
   /**
    * Authentication handlers
    */
-  const handleAuthSuccess = useCallback((user) => {
+  const handleAuthSuccess = useCallback((user, token, authData) => {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
-    setAccountNotice({
-      type: 'success',
-      title: `Welcome back, @${user.handle}!`,
-      message: 'Your account is active. All your posts and profile have been restored.',
-    });
+
+    // Only display the reactivation banner if the account was previously deactivated and has just been restored
+    if (authData?.reactivated || authData?.wasReactivated) {
+      setAccountNotice({
+        type: 'success',
+        title: `Welcome back, @${user.handle}!`,
+        message: 'Your account is active. All your posts and profile have been restored.',
+      });
+    } else {
+      setAccountNotice(null);
+    }
+
     // Reload feed immediately to display following feed for authenticated user
     fetchFeedBatch(true, null);
     refreshUsers();

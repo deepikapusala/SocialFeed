@@ -68,6 +68,8 @@ class AuthTokenResponse(CamelModel):
     token_type: str = "Bearer"
     expires_at: datetime
     user: UserProfile
+    reactivated: bool = False
+    was_reactivated: bool = False
 
 
 class CurrentUserResponse(CamelModel):

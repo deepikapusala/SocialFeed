@@ -161,6 +161,7 @@ class AuthService:
             )
 
         # Automatic reactivation on valid login for temporarily deactivated accounts
+        was_reactivated = not user.is_active
         if not user.is_active:
             user.is_active = True
             await self._session.commit()
@@ -186,6 +187,8 @@ class AuthService:
             token_type="Bearer",
             expires_at=expires_at,
             user=user_profile,
+            reactivated=was_reactivated,
+            was_reactivated=was_reactivated,
         )
 
     async def logout(self, raw_token: str) -> None:

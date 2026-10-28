@@ -90,7 +90,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         handle: p.handle,
         password: p.password,
       });
-      onAuthSuccess(data.user, data.accessToken);
+      onAuthSuccess(data.user, data.accessToken, data);
       onClose();
     } catch (err) {
       console.error('Authentication failed:', err);
@@ -120,7 +120,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         });
       }
 
-      onAuthSuccess(data.user, data.accessToken);
+      onAuthSuccess(data.user, data.accessToken, data);
       onClose();
     } catch (err) {
       console.error('Authentication failed:', err);
