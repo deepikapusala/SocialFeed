@@ -59,20 +59,19 @@ TARGET_USERS = [
     },
 ]
 
+KEEP_HANDLES = {'asha', 'deepu', 'ani', 'virat', 'sneha', 'vivek', 'sand', 't1234', 'gollapilli'}
+
 async def main():
     session_factory = get_async_sessionmaker()
-    target_ids = [u["id"] for u in TARGET_USERS]
-    target_handles = [u["handle"] for u in TARGET_USERS]
 
     async with session_factory() as session:
-        print("--- Step 1: Upsert / Ensure the 5 Target Users ---")
+        print("--- Step 1: Ensure Target Users Exist ---")
         for u_data in TARGET_USERS:
             pw_hash = await hash_password(u_data["password"])
             res = await session.execute(select(User).where(User.id == u_data["id"]))
             user = res.scalar_one_or_none()
 
             if not user:
-                # check by handle
                 res_h = await session.execute(select(User).where(User.handle == u_data["handle"]))
                 user = res_h.scalar_one_or_none()
 
@@ -86,7 +85,12 @@ async def main():
                 user.password_hash = pw_hash
                 user.is_active = True
                 user.is_private = False
-                print(f"Updated user: @{user.handle} ({user.display_name}) [{user.id}]")
+                print(f"Verified core user: @{user.handle}")
+
+        # Get all 9 target user IDs
+        res_ids = await session.execute(select(User.id).where(User.handle.in_(KEEP_HANDLES)))
+        target_ids = [row[0] for row in res_ids.all()]
+        print(f"Target users found: {len(target_ids)}")
             else:
                 new_user = User(
                     id=u_data["id"],

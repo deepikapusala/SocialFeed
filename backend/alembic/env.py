@@ -2,7 +2,7 @@ import asyncio
 import os
 import sys
 from logging.config import fileConfig
-
+ 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -15,6 +15,8 @@ from app.config import get_settings
 from app.models import Base
 
 # Alembic Config object
+#context.config is Alembic's built-in object representing that alembic.ini file.
+#This lets us read from or modify Alembic’s settings directly in Python code.
 config = context.config
 
 # Interpret the config file for Python logging.
