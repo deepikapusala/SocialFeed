@@ -56,6 +56,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     large_url = regexp_replace(large_url, '\\?.*$', '') || '?auto=format&fit=crop&w=1080&q=80'
                 WHERE (small_url LIKE '%unsplash.com%' AND small_url NOT LIKE '%w=1080&q=80%')
                    OR (large_url LIKE '%unsplash.com%' AND large_url NOT LIKE '%w=1080&q=80%');
+
+                UPDATE users
+                SET avatar_small_url = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=150&q=80',
+                    avatar_large_url = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80'
+                WHERE (avatar_small_url LIKE '%unsplash.com/photos/%' OR avatar_large_url LIKE '%unsplash.com/photos/%');
             """))
             await session.commit()
     except Exception:

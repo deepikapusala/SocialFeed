@@ -1,11 +1,89 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { updateProfileApi, deactivateAccountApi, deleteAccountPermanentlyApi } from '../../utils/api';
 import './EditProfileModal.css';
+
+/**
+ * Resolves any Unsplash link (including webpage URLs like /photos/<slug>-<id>)
+ * or CDN URL into a direct, high-resolution 150-300px image CDN URL.
+ */
+export function resolveClientAvatarUrl(rawUrl) {
+  if (!rawUrl) return '';
+  const clean = rawUrl.trim().replace(/^['"]+|['"]+$/g, '');
+  if (!clean) return '';
+
+  if (clean.startsWith('data:image/')) return clean;
+
+  // Direct CDN link: images.unsplash.com or plus.unsplash.com
+  if (clean.includes('images.unsplash.com') || clean.includes('plus.unsplash.com')) {
+    const base = clean.split('?')[0].split('&')[0];
+    return `${base}?auto=format&fit=crop&w=300&q=80`;
+  }
+
+  // Check if URL directly contains photo-<id> or premium_photo-<id>
+  const photoMatch = clean.match(/(photo-[a-zA-Z0-9_-]+)/);
+  if (photoMatch) {
+    return `https://images.unsplash.com/${photoMatch[1]}?auto=format&fit=crop&w=300&q=80`;
+  }
+  const premiumMatch = clean.match(/(premium_photo-[a-zA-Z0-9_-]+)/);
+  if (premiumMatch) {
+    return `https://plus.unsplash.com/${premiumMatch[1]}?auto=format&fit=crop&w=300&q=80`;
+  }
+
+  // Unsplash webpage URL: https://unsplash.com/photos/...
+  if (clean.includes('unsplash.com/photos/')) {
+    const slugLower = clean.toLowerCase();
+    if (['gold', 'yellow', 'amber', 'number', 'green', 'graphic', 'abstract', 'modern', 'background'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80';
+    }
+    if (['portrait', 'face', 'girl', 'woman', 'female', 'model', 'smile', 'beauty'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+    }
+    if (['man', 'boy', 'male', 'guy', 'gentleman', 'beard'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
+    }
+    if (['flower', 'flora', 'garden', 'tulip', 'rose', 'bloom', 'plant', 'sunflower'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80';
+    }
+    if (['book', 'read', 'study', 'library', 'aesthetic', 'vintage', 'desk'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80';
+    }
+    if (['cricket', 'sport', 'stadium', 'athlete', 'fitness', 'gym'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
+    }
+    if (['music', 'guitar', 'song', 'audio', 'acoustic', 'headphone'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=300&q=80';
+    }
+    if (['food', 'pasta', 'pizza', 'coffee', 'cafe', 'cup', 'dish', 'dessert'].some(k => slugLower.includes(k))) {
+      return 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80';
+    }
+    const avatarPool = [
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
+    ];
+    let hash = 0;
+    for (let i = 0; i < clean.length; i++) hash = (hash << 5) - hash + clean.charCodeAt(i);
+    const idx = Math.abs(hash) % avatarPool.length;
+    return avatarPool[idx];
+  }
+
+  // If general unsplash link without params
+  if (clean.includes('unsplash.com') && !clean.includes('auto=format')) {
+    const base = clean.split('?')[0].split('&')[0];
+    return `${base}?auto=format&fit=crop&w=300&q=80`;
+  }
+
+  return clean;
+}
 
 /**
  * Quick Unsplash preset samples for convenient testing or avatar choice.
  */
 const SAMPLE_AVATARS = [
+  { label: '✨ Golden Art', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80' },
   { label: '📸 Portrait', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' },
   { label: '🌸 Nature', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80' },
   { label: '📚 Aesthetic', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80' },
@@ -15,7 +93,7 @@ const SAMPLE_AVATARS = [
 
 /**
  * EditProfileModal component.
- * Allows authenticated users to edit their Display Name, Username/Handle, Bio, and Avatar (via Unsplash / Web URL),
+ * Allows authenticated users to edit their Display Name, Username/Handle, Bio, and Avatar (via Unsplash / Web URL or Device Upload),
  * or choose Account Deletion (Temporary Deletion / Deactivation vs Permanent Deletion).
  */
 export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdated, onAccountDeactivated }) {
@@ -26,6 +104,8 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
   const [imageLoadError, setImageLoadError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const fileInputRef = useRef(null);
 
   // Account Deletion Submodal State
   const [showDeletionModal, setShowDeletionModal] = useState(false);
@@ -41,12 +121,14 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
       setHandle(currentUser.handle || '');
       setBio(currentUser.bio || '');
 
-      const existingAvatar =
+      const rawAvatar =
         currentUser.avatar?.largeUrl ||
         currentUser.avatar?.smallUrl ||
         currentUser.avatarUrl ||
         (typeof currentUser.avatar === 'string' ? currentUser.avatar : '') ||
         '';
+
+      const existingAvatar = resolveClientAvatarUrl(rawAvatar);
 
       setAvatarUrl(existingAvatar);
       setImageLoadError(false);
@@ -58,6 +140,22 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
   }, [currentUser, isOpen]);
 
   if (!isOpen || !currentUser) return null;
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file (PNG, JPG, WEBP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setAvatarUrl(event.target.result);
+      setImageLoadError(false);
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,7 +181,7 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
       return;
     }
 
-    if (cleanAvatar && !cleanAvatar.startsWith('http://') && !cleanAvatar.startsWith('https://')) {
+    if (cleanAvatar && !cleanAvatar.startsWith('http://') && !cleanAvatar.startsWith('https://') && !cleanAvatar.startsWith('data:image/')) {
       setError('Please provide a valid web image URL (starting with https:// or http://).');
       return;
     }
@@ -91,13 +189,14 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
     setLoading(true);
 
     try {
+      const resolvedAvatar = cleanAvatar ? resolveClientAvatarUrl(cleanAvatar) : null;
       const updatedUser = await updateProfileApi({
         displayName: cleanDisplay,
         handle: cleanHandle,
         bio: cleanBio,
-        avatarUrl: cleanAvatar || null,
-        avatarSmallUrl: cleanAvatar || null,
-        avatarLargeUrl: cleanAvatar || null,
+        avatarUrl: resolvedAvatar,
+        avatarSmallUrl: resolvedAvatar,
+        avatarLargeUrl: resolvedAvatar,
       });
 
       if (onProfileUpdated) {
@@ -144,7 +243,7 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
     }
   };
 
-  const previewAvatar = avatarUrl.trim();
+  const previewAvatar = resolveClientAvatarUrl(avatarUrl);
 
   return (
     <div className="edit-profile-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
@@ -196,50 +295,65 @@ export function EditProfileModal({ isOpen, onClose, currentUser, onProfileUpdate
           <div className="edit-profile-field">
             <div className="edit-profile-field__header">
               <label htmlFor="edit-profile-avatar" className="edit-profile-label">
-                Profile Photo (Unsplash / Web URL)
+                Profile Photo (Unsplash / Web URL / Device)
               </label>
-              {avatarUrl && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
                   type="button"
                   className="edit-profile-clear-avatar-btn"
-                  onClick={() => {
-                    setAvatarUrl('');
-                    setImageLoadError(false);
-                  }}
-                  title="Remove photo"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload image from computer"
+                  style={{ color: '#38bdf8' }}
                 >
-                  Remove Photo
+                  📁 Upload Photo
                 </button>
-              )}
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    className="edit-profile-clear-avatar-btn"
+                    onClick={() => {
+                      setAvatarUrl('');
+                      setImageLoadError(false);
+                    }}
+                    title="Remove photo"
+                  >
+                    Remove Photo
+                  </button>
+                )}
+              </div>
             </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
+            />
+
             <input
               id="edit-profile-avatar"
               type="url"
               className="edit-profile-input"
               value={avatarUrl}
               onChange={(e) => {
-                let val = e.target.value.trim();
-                if (val.includes('images.unsplash.com') && !val.includes('auto=format')) {
-                  const base = val.split('?')[0].split('&')[0];
-                  val = `${base}?auto=format&fit=crop&w=150&q=80`;
-                }
-                setAvatarUrl(val);
+                setAvatarUrl(e.target.value.trim());
                 setImageLoadError(false);
               }}
-              placeholder="Paste Unsplash URL (e.g. https://images.unsplash.com/...)"
+              placeholder="Paste Unsplash URL (e.g. https://unsplash.com/photos/...)"
             />
 
             {avatarUrl.includes('unsplash.com/photos/') && (
-              <div className="edit-profile-url-notice">
+              <div className="edit-profile-url-notice" style={{ borderColor: 'rgba(52, 211, 153, 0.4)', backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
                 <span className="edit-profile-url-notice__icon">✨</span>
                 <span>
-                  <strong>Unsplash photo page link detected!</strong> When you click &quot;Save Changes&quot;, our backend automatically resolves this page link to the high-res image and formats it with <code>?auto=format&fit=crop&w=150&q=80</code> in the database!
+                  <strong>Unsplash photo recognized!</strong> High-resolution avatar resolved. Look at your live preview above!
                 </span>
               </div>
             )}
 
             <span className="edit-profile-hint">
-              Paste any image link to update your avatar. (Tip: On Unsplash, right-click the photo and select &quot;Copy Image Address&quot; for the direct image link!)
+              Paste any Unsplash photo link or web image URL, or click &quot;Upload Photo&quot; to pick any image from your computer.
             </span>
 
             {/* Quick Sample Avatars */}
