@@ -64,6 +64,7 @@ export function SuggestedProfiles({
   onToggleFollow,
   followingMap = {},
   onSelectProfile,
+  onViewProfile,
   refreshKey = 0,
 }) {
   const [coreProfiles, setCoreProfiles] = useState(ALL_PROFILES);
@@ -176,9 +177,9 @@ export function SuggestedProfiles({
                 src={currentUserAvatar}
                 alt={currentUser.handle}
                 className="suggested-sidebar__my-avatar"
-                onClick={() => onSelectProfile && onSelectProfile(currentUser.handle)}
-                style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
-                title={`View posts by @${currentUser.handle}`}
+                onClick={() => (onViewProfile || onSelectProfile)?.(currentUser.handle)}
+                style={{ cursor: 'pointer' }}
+                title={`View profile of @${currentUser.handle}`}
                 onError={(e) => {
                   e.target.style.display = 'none';
                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
@@ -187,7 +188,9 @@ export function SuggestedProfiles({
             ) : null}
             <div
               className="suggested-sidebar__my-avatar-fallback"
-              style={{ display: currentUserAvatar ? 'none' : 'flex' }}
+              style={{ display: currentUserAvatar ? 'none' : 'flex', cursor: 'pointer' }}
+              onClick={() => (onViewProfile || onSelectProfile)?.(currentUser.handle)}
+              title={`View profile of @${currentUser.handle}`}
             >
               {(currentUser.displayName || currentUser.handle || 'U').charAt(0).toUpperCase()}
             </div>
@@ -195,23 +198,34 @@ export function SuggestedProfiles({
 
           <div
             className="suggested-sidebar__my-info"
-            onClick={() => onSelectProfile && onSelectProfile(currentUser.handle)}
-            style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
-            title={`View posts by @${currentUser.handle}`}
+            onClick={() => (onViewProfile || onSelectProfile)?.(currentUser.handle)}
+            style={{ cursor: 'pointer' }}
+            title={`View profile of @${currentUser.handle}`}
           >
             <span className="suggested-sidebar__my-name">
               {currentUser.displayName || currentUser.handle}
             </span>
             <span className="suggested-sidebar__my-handle">@{currentUser.handle}</span>
           </div>
-          <button
-            type="button"
-            className="suggested-sidebar__switch-btn"
-            onClick={onOpenAuth}
-            title="Switch profile"
-          >
-            Switch
-          </button>
+
+          <div className="suggested-sidebar__my-actions">
+            <button
+              type="button"
+              className="suggested-sidebar__view-btn"
+              onClick={() => (onViewProfile || onSelectProfile)?.(currentUser.handle)}
+              title={`View profile of @${currentUser.handle}`}
+            >
+              View Profile
+            </button>
+            <button
+              type="button"
+              className="suggested-sidebar__switch-btn"
+              onClick={onOpenAuth}
+              title="Switch profile"
+            >
+              Switch
+            </button>
+          </div>
         </div>
       )}
 
@@ -246,9 +260,9 @@ export function SuggestedProfiles({
             <div key={p.handle} className="suggested-profile-card" role="listitem">
               <div
                 className="suggested-profile-card__avatar-wrapper"
-                onClick={() => onSelectProfile && onSelectProfile(p.handle)}
-                style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
-                title={`View posts by @${p.handle}`}
+                onClick={() => (onViewProfile || onSelectProfile)?.(p.handle)}
+                style={{ cursor: 'pointer' }}
+                title={`View profile of @${p.handle}`}
               >
                 {p.avatar ? (
                   <img
@@ -272,9 +286,9 @@ export function SuggestedProfiles({
 
               <div
                 className="suggested-profile-card__content"
-                onClick={() => onSelectProfile && onSelectProfile(p.handle)}
-                style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
-                title={`View posts by @${p.handle}`}
+                onClick={() => (onViewProfile || onSelectProfile)?.(p.handle)}
+                style={{ cursor: 'pointer' }}
+                title={`View profile of @${p.handle}`}
               >
                 <div className="suggested-profile-card__names">
                   <span className="suggested-profile-card__name">{p.displayName}</span>
@@ -329,9 +343,9 @@ export function SuggestedProfiles({
               >
                 <div
                   className="suggested-profile-card__avatar-wrapper"
-                  onClick={() => onSelectProfile && onSelectProfile(p.handle)}
-                  style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
-                  title={`View posts by @${p.handle}`}
+                  onClick={() => (onViewProfile || onSelectProfile)?.(p.handle)}
+                  style={{ cursor: 'pointer' }}
+                  title={`View profile of @${p.handle}`}
                 >
                   {p.avatar ? (
                     <img
@@ -355,9 +369,9 @@ export function SuggestedProfiles({
 
                 <div
                   className="suggested-profile-card__content"
-                  onClick={() => onSelectProfile && onSelectProfile(p.handle)}
-                  style={{ cursor: onSelectProfile ? 'pointer' : 'default' }}
-                  title={`View posts by @${p.handle}`}
+                  onClick={() => (onViewProfile || onSelectProfile)?.(p.handle)}
+                  style={{ cursor: 'pointer' }}
+                  title={`View profile of @${p.handle}`}
                 >
                   <div className="suggested-profile-card__names">
                     <span className="suggested-profile-card__name">{p.displayName}</span>

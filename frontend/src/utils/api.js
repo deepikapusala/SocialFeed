@@ -851,10 +851,96 @@ export async function deleteAccountPermanentlyApi(password) {
   return data;
 }
 
+/**
+ * Fetches user profile data by UUID or @handle via GET /users/:id.
+ */
+export async function fetchUserProfileApi(userIdOrHandle) {
+  if (!userIdOrHandle) return null;
+  const clean = userIdOrHandle.replace(/^@/, '');
+  const response = await fetch(`${API_BASE_URL}/users/${clean}`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
 
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Failed to fetch profile (${response.status})`);
+  }
 
+  const data = await response.json();
+  return data.item;
+}
 
+/**
+ * Fetches posts or reposts for a target user via GET /users/:id/posts?tab=posts|reposts.
+ */
+export async function fetchUserPostsApi(userIdOrHandle, tab = 'posts') {
+  if (!userIdOrHandle) return { items: [] };
+  const clean = userIdOrHandle.replace(/^@/, '');
+  const response = await fetch(`${API_BASE_URL}/users/${clean}/posts?tab=${tab}&limit=40`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
 
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Failed to fetch user posts (${response.status})`);
+  }
 
+  const data = await response.json();
+  const rawItems = Array.isArray(data.items) ? data.items : [];
+  return {
+    ...data,
+    items: rawItems.map(normalizePostItem).filter(Boolean),
+  };
+}
 
+/**
+ * Fetches followers list for a user via GET /users/:id/followers.
+ */
+export async function fetchUserFollowersApi(userIdOrHandle) {
+  if (!userIdOrHandle) return [];
+  const clean = userIdOrHandle.replace(/^@/, '');
+  const response = await fetch(`${API_BASE_URL}/users/${clean}/followers?limit=50`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
 
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+/**
+ * Fetches following list for a user via GET /users/:id/following.
+ */
+export async function fetchUserFollowingApi(userIdOrHandle) {
+  if (!userIdOrHandle) return [];
+  const clean = userIdOrHandle.replace(/^@/, '');
+  const response = await fetch(`${API_BASE_URL}/users/${clean}/following?limit=50`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.items) ? data.items : [];
+}

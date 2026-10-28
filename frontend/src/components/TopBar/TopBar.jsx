@@ -19,6 +19,7 @@ export function TopBar({
   onOpenCreatePost,
   onLogout,
   onSelectPost,
+  onViewProfile,
 }) {
   // Prevent form submission page refresh when pressing Enter
   const handleSubmit = (e) => {
@@ -90,6 +91,9 @@ export function TopBar({
                   }
                   alt={currentUser.handle}
                   className="topbar__user-avatar"
+                  onClick={() => onViewProfile && onViewProfile(currentUser.handle)}
+                  style={{ cursor: onViewProfile ? 'pointer' : 'default' }}
+                  title={`View profile of @${currentUser.handle}`}
                   onError={(e) => {
                     e.target.style.display = 'none';
                     if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
@@ -98,17 +102,27 @@ export function TopBar({
               ) : null}
               <div
                 className="topbar__user-avatar-fallback"
+                onClick={() => onViewProfile && onViewProfile(currentUser.handle)}
                 style={{
                   display:
                     currentUser.avatar?.smallUrl || currentUser.avatar?.largeUrl || currentUser.avatarUrl
                       ? 'none'
                       : 'flex',
+                  cursor: onViewProfile ? 'pointer' : 'default',
                 }}
+                title={`View profile of @${currentUser.handle}`}
               >
                 {(currentUser.displayName || currentUser.handle || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="topbar__user-meta">
-                <span className="topbar__user-handle">@{currentUser.handle}</span>
+                <span
+                  className="topbar__user-handle"
+                  onClick={() => onViewProfile && onViewProfile(currentUser.handle)}
+                  style={{ cursor: onViewProfile ? 'pointer' : 'default' }}
+                  title={`View profile of @${currentUser.handle}`}
+                >
+                  @{currentUser.handle}
+                </span>
                 <button
                   type="button"
                   className="topbar__edit-profile-btn"

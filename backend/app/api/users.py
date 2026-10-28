@@ -78,6 +78,24 @@ async def list_all_users(
 
 
 
+from app.common.errors import NotFoundError
+from app.schemas.post import FeedResponse, PostItem
+
+
+async def _resolve_user_uuid(session: AsyncSession, identifier: str) -> str:
+    clean = identifier.strip().lstrip("@")
+    try:
+        uuid.UUID(clean)
+        return clean
+    except ValueError:
+        stmt = select(User.id).where(User.handle == clean.lower())
+        res = await session.execute(stmt)
+        found = res.scalar_one_or_none()
+        if not found:
+            raise NotFoundError(f"User '@{clean}' not found.")
+        return str(found)
+
+
 @router.get("/users/me", response_model=UserProfileResponse)
 async def get_my_profile(
     actor: User = Depends(get_required_actor),
@@ -93,41 +111,112 @@ async def get_my_profile(
 @router.get("/users/{id}", response_model=UserProfileResponse)
 async def get_user_profile(
     id: str,
+    session: AsyncSession = Depends(get_async_session),
     repo: SocialRepositoryProtocol = Depends(get_repository),
     viewer_id: str = Depends(get_current_actor_id),
 ) -> UserProfileResponse:
     """
-    Retrieve user profile by UUID.
+    Retrieve user profile by UUID or @handle.
     """
+    resolved_id = await _resolve_user_uuid(session, id)
     service = SocialService(repo)
-    return await service.get_user_profile(user_id=id, viewer_id=viewer_id)
+    return await service.get_user_profile(user_id=resolved_id, viewer_id=viewer_id)
+
+
+@router.get("/users/{id}/posts", response_model=FeedResponse)
+async def list_user_posts(
+    id: str,
+    cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
+    limit: int = Query(30, description="Page size (1-50)"),
+    tab: str = Query("posts", description="'posts' (original posts) or 'reposts'"),
+    session: AsyncSession = Depends(get_async_session),
+    repo: SocialRepositoryProtocol = Depends(get_repository),
+    viewer_id: str = Depends(get_current_actor_id),
+) -> FeedResponse:
+    """
+    Retrieve paginated posts or reposts for a target user profile (by UUID or @handle).
+    """
+    resolved_id = await _resolve_user_uuid(session, id)
+    target_uuid = uuid.UUID(resolved_id)
+    from app.models.post import Post
+
+    if tab == "reposts":
+        # Get reposts authored by target user and resolve their original post details
+        stmt = (
+            select(Post.repost_of_id)
+            .where(
+                and_(
+                    Post.author_id == target_uuid,
+                    Post.kind == "repost",
+                    Post.deleted_at.is_(None),
+                )
+            )
+            .order_by(Post.created_at.desc())
+            .limit(limit)
+        )
+        res = await session.execute(stmt)
+        orig_ids = [oid for oid in res.scalars().all() if oid]
+
+        items = []
+        for orig_id in orig_ids:
+            detail = await repo.get_post_detail(str(orig_id), viewer_id=viewer_id)
+            if detail:
+                items.append(PostItem(**detail))
+        return FeedResponse(items=items, next_cursor=None, has_more=False)
+    else:
+        # Get original posts authored by target user
+        stmt = (
+            select(Post.id)
+            .where(
+                and_(
+                    Post.author_id == target_uuid,
+                    Post.kind == "original",
+                    Post.deleted_at.is_(None),
+                )
+            )
+            .order_by(Post.created_at.desc())
+            .limit(limit)
+        )
+        res = await session.execute(stmt)
+        post_ids = res.scalars().all()
+
+        items = []
+        for pid in post_ids:
+            detail = await repo.get_post_detail(str(pid), viewer_id=viewer_id)
+            if detail:
+                items.append(PostItem(**detail))
+        return FeedResponse(items=items, next_cursor=None, has_more=False)
 
 
 @router.put("/users/{id}/follow", response_model=FollowResponse)
 async def follow_user(
     id: str,
+    session: AsyncSession = Depends(get_async_session),
     repo: SocialRepositoryProtocol = Depends(get_repository),
     viewer_id: str = Depends(get_current_actor_id),
 ) -> FollowResponse:
     """
-    Follow a target user as the current viewer.
+    Follow a target user as the current viewer (by UUID or @handle).
     """
+    resolved_id = await _resolve_user_uuid(session, id)
     service = SocialService(repo)
-    result = await service.follow_user(follower_id=viewer_id, target_user_id=id)
+    result = await service.follow_user(follower_id=viewer_id, target_user_id=resolved_id)
     return FollowResponse(**result)
 
 
 @router.delete("/users/{id}/follow", response_model=FollowResponse)
 async def unfollow_user(
     id: str,
+    session: AsyncSession = Depends(get_async_session),
     repo: SocialRepositoryProtocol = Depends(get_repository),
     viewer_id: str = Depends(get_current_actor_id),
 ) -> FollowResponse:
     """
-    Unfollow a target user as the current viewer.
+    Unfollow a target user as the current viewer (by UUID or @handle).
     """
+    resolved_id = await _resolve_user_uuid(session, id)
     service = SocialService(repo)
-    result = await service.unfollow_user(follower_id=viewer_id, target_user_id=id)
+    result = await service.unfollow_user(follower_id=viewer_id, target_user_id=resolved_id)
     return FollowResponse(**result)
 
 
@@ -135,6 +224,7 @@ async def unfollow_user(
 @router.post("/requests/{requester_id}/accept", response_model=FollowRequestAcceptResponse)
 async def accept_follow_request(
     requester_id: str,
+    session: AsyncSession = Depends(get_async_session),
     actor_id: str = Depends(get_current_actor_id),
     repo: SocialRepositoryProtocol = Depends(get_repository),
 ) -> FollowRequestAcceptResponse:
@@ -142,8 +232,9 @@ async def accept_follow_request(
     Accepts a pending follow request from requester_id.
     Caller is the target receiving the request.
     """
+    resolved_requester_id = await _resolve_user_uuid(session, requester_id)
     service = SocialService(repo)
-    res = await service.accept_follow_request(actor_id=actor_id, requester_id=requester_id)
+    res = await service.accept_follow_request(actor_id=actor_id, requester_id=resolved_requester_id)
     return FollowRequestAcceptResponse(**res)
 
 
@@ -151,6 +242,7 @@ async def accept_follow_request(
 @router.post("/requests/{requester_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
 async def reject_follow_request(
     requester_id: str,
+    session: AsyncSession = Depends(get_async_session),
     actor_id: str = Depends(get_current_actor_id),
     repo: SocialRepositoryProtocol = Depends(get_repository),
 ) -> None:
@@ -158,25 +250,28 @@ async def reject_follow_request(
     Rejects a pending follow request from requester_id.
     Caller is the target receiving the request.
     """
+    resolved_requester_id = await _resolve_user_uuid(session, requester_id)
     service = SocialService(repo)
-    await service.reject_follow_request(actor_id=actor_id, requester_id=requester_id)
+    await service.reject_follow_request(actor_id=actor_id, requester_id=resolved_requester_id)
 
 
 @router.get("/users/{id}/followers", response_model=PaginatedResponse[RelationshipUserItem])
 async def list_followers(
     id: str,
+    session: AsyncSession = Depends(get_async_session),
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
-    limit: int = Query(10, description="Page size (1-50)"),
+    limit: int = Query(50, description="Page size (1-50)"),
     viewer_id: str = Depends(get_current_actor_id),
     repo: SocialRepositoryProtocol = Depends(get_repository),
 ) -> PaginatedResponse[RelationshipUserItem]:
     """
-    Returns bounded, cursor-paginated active followers of user_id.
+    Returns bounded, cursor-paginated active followers of user_id (by UUID or @handle).
     Enforces privacy visibility.
     """
+    resolved_id = await _resolve_user_uuid(session, id)
     service = SocialService(repo)
     return await service.list_followers(
-        user_id=id,
+        user_id=resolved_id,
         viewer_id=viewer_id,
         cursor_str=cursor,
         limit=limit,
@@ -186,18 +281,20 @@ async def list_followers(
 @router.get("/users/{id}/following", response_model=PaginatedResponse[RelationshipUserItem])
 async def list_following(
     id: str,
+    session: AsyncSession = Depends(get_async_session),
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
-    limit: int = Query(10, description="Page size (1-50)"),
+    limit: int = Query(50, description="Page size (1-50)"),
     viewer_id: str = Depends(get_current_actor_id),
     repo: SocialRepositoryProtocol = Depends(get_repository),
 ) -> PaginatedResponse[RelationshipUserItem]:
     """
-    Returns bounded, cursor-paginated active followees of user_id.
+    Returns bounded, cursor-paginated active followees of user_id (by UUID or @handle).
     Enforces privacy visibility.
     """
+    resolved_id = await _resolve_user_uuid(session, id)
     service = SocialService(repo)
     return await service.list_following(
-        user_id=id,
+        user_id=resolved_id,
         viewer_id=viewer_id,
         cursor_str=cursor,
         limit=limit,
@@ -207,17 +304,19 @@ async def list_following(
 @router.get("/users/{id}/media", response_model=PaginatedResponse[MediaItem])
 async def list_profile_media(
     id: str,
+    session: AsyncSession = Depends(get_async_session),
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor token"),
-    limit: int = Query(10, description="Page size (1-50)"),
+    limit: int = Query(30, description="Page size (1-50)"),
     viewer_id: str = Depends(get_current_actor_id),
     repo: SocialRepositoryProtocol = Depends(get_repository),
 ) -> PaginatedResponse[MediaItem]:
     """
     Retrieve paginated media rows from a user's original posts.
     """
+    resolved_id = await _resolve_user_uuid(session, id)
     service = SocialService(repo)
     return await service.list_profile_media(
-        user_id=id,
+        user_id=resolved_id,
         cursor_str=cursor,
         limit=limit,
         viewer_id=viewer_id,
