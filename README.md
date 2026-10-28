@@ -4,74 +4,93 @@ A full-stack social feed platform featuring a high-performance **FastAPI** async
 
 ---
 
-## 💻 Windows Quick Start Guide (Step-by-Step for Evaluators / Mentors)
+## 🌐 1. Live Cloud Production Deployment (Immediate Evaluation)
 
-This guide is specifically tailored for **Windows (PowerShell or Command Prompt)**. Follow each step sequentially using dedicated terminal windows.
+The entire full-stack application is deployed live in the cloud and ready to explore without needing any local setup:
+
+| Service | Provider | Live URL | Description |
+| :--- | :--- | :--- | :--- |
+| **Frontend Web App** | **Vercel** | [https://social-feed-deepikapusalas-projects.vercel.app/](https://social-feed-deepikapusalas-projects.vercel.app/) | Production React 18 / Vite SPA with full explore grid, carousels, modals, and dark mode. |
+| **Backend API** | **Render** | [https://social-feed-backend-m32o.onrender.com/](https://social-feed-backend-m32o.onrender.com/) | Live FastAPI Async ASGI Engine with CORS, authentication, and session handling. |
+| **Interactive API Docs** | **Swagger UI** | [https://social-feed-backend-m32o.onrender.com/docs](https://social-feed-backend-m32o.onrender.com/docs) | Interactive Swagger UI to inspect and test all API endpoints live. |
+| **OpenAPI Spec** | **JSON** | [https://social-feed-backend-m32o.onrender.com/openapi.json](https://social-feed-backend-m32o.onrender.com/openapi.json) | Raw OpenAPI v3.1 schema. |
+| **Database** | **Render PostgreSQL** | Singapore Region | Managed cloud PostgreSQL instance running schema and deterministic seed dataset. |
+
+### 🗄️ Cloud Database Credentials & Connection Strings
+
+| Connection Type | Connection String / Command |
+| :--- | :--- |
+| **External Database URL** *(For local tools, psql, pgAdmin)* | `postgresql://instagram_modeling_user:WaZk9Z0USSex8nF0APKxwCEoZVxgKo4L@dpg-dbh2avu1egvs7398p6g0-a.singapore-postgres.render.com/instagram_modeling` |
+| **Internal Database URL** *(Used by Render backend)* | `postgresql://instagram_modeling_user:WaZk9Z0USSex8nF0APKxwCEoZVxgKo4L@dpg-dbh2avu1egvs7398p6g0-a/instagram_modeling` |
+| **Direct PSQL CLI Command** | `PGPASSWORD=WaZk9Z0USSex8nF0APKxwCEoZVxgKo4L psql -h dpg-dbh2avu1egvs7398p6g0-a.singapore-postgres.render.com -U instagram_modeling_user instagram_modeling` |
+
+#### How to Re-Seed or Populate the Cloud Database:
+From your local Windows terminal at the project root (`Instagram\`):
+```powershell
+# Set UTF-8 encoding in PowerShell to support bio emojis
+$env:PGCLIENTENCODING = "UTF8"
+
+# Execute seed script directly against cloud database
+psql "postgresql://instagram_modeling_user:WaZk9Z0USSex8nF0APKxwCEoZVxgKo4L@dpg-dbh2avu1egvs7398p6g0-a.singapore-postgres.render.com/instagram_modeling" -f db\seed.sql
+```
+*(Or inside `psql`, run `\encoding UTF8` followed by `\i db/seed.sql` and then `\q`).*
 
 ---
 
+## 💻 2. Local Windows Setup Guide (Run from ZIP Archive)
+
+If you downloaded the `.zip` archive to run and evaluate locally on Windows, follow these exact step-by-step instructions.
+
 ### Step 0: Extract the ZIP Archive
 1. Right-click the downloaded `.zip` file and select **Extract All...**.
-2. Choose an extraction destination (for example: `C:\Instagram` or `D:\Instagram`).
-3. Open the extracted folder in **VS Code** (or open Windows Terminal / PowerShell here).
+2. Extract to a clean folder without spaces (e.g., `C:\Instagram` or `D:\Instagram`).
+3. Open the folder in **VS Code** (or open Windows Terminal / PowerShell).
 
 ---
 
 ### Step 1: System Prerequisites (Windows)
 
-Ensure the following tools are installed and accessible from your Windows terminal:
+Ensure the following tools are installed:
 
 | Tool | Recommended Version | Verification Command | Windows Installation Link |
 | :--- | :--- | :--- | :--- |
-| **Python** | 3.11 or higher | `python --version` | [python.org/downloads](https://www.python.org/downloads/) *(Check "Add python.exe to PATH")* |
+| **Python** | 3.11+ | `python --version` | [python.org/downloads](https://www.python.org/downloads/) *(Check "Add python.exe to PATH")* |
 | **Node.js & npm** | Node 18+ / npm 9+ | `node --version` & `npm --version` | [nodejs.org](https://nodejs.org/) *(LTS version recommended)* |
 | **PostgreSQL** | 15 or 16+ | `psql --version` | [enterprisedb.com/downloads](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads) |
 
 > [!NOTE]
-> **PostgreSQL on Windows:** Ensure the PostgreSQL Windows Service is running (search for `Services` in the Windows Start menu, locate `postgresql-x64-xx`, and verify its status is **Running**).  
-> Remember the password you set for the default `postgres` user during installation.
+> Make sure the PostgreSQL Windows Service is running (`services.msc` -> `postgresql-x64-xx` status is **Running**).
 
 ---
 
-### Step 2: Database Setup & Migration (PostgreSQL)
+### Step 2: Database Initialization (Local PostgreSQL)
 
-Open a terminal at the project root (`Instagram\`) or use **Windows PowerShell**:
+Open **Windows PowerShell** at the project root (`Instagram\`):
 
-#### 1. Create the Isolated Application Database
-Run the following command to create the `instagram_modeling` database:
+#### 1. Create the Local Database
 ```powershell
 createdb -U postgres instagram_modeling
 ```
-*(Enter your PostgreSQL `postgres` password when prompted).*
-
-> **Alternative (using SQL Shell / psql):**
-> If `createdb` is not recognized, run `psql -U postgres` and execute:
-> ```sql
-> CREATE DATABASE instagram_modeling;
-> \q
-> ```
+*(Enter your PostgreSQL password when prompted. If `createdb` is not in PATH, use SQL Shell and run `CREATE DATABASE instagram_modeling;`).*
 
 ---
 
 ### Step 3: Backend Setup & Execution (Terminal 1)
 
 Open **Terminal 1** and navigate into the `backend` folder:
-
 ```powershell
 cd backend
 ```
 
 #### 1. Configure the Backend `.env` File
-Copy the example environment file:
 ```powershell
 # In PowerShell:
 Copy-Item .env.example .env
 
-# Or in Command Prompt (CMD):
+# Or in CMD:
 copy .env.example .env
 ```
-
-Open `backend\.env` in Notepad or VS Code and update your PostgreSQL password on line 18:
+Open `backend\.env` in VS Code / Notepad and update line 18 with your local password:
 ```env
 PORT=8000
 FRONTEND_ORIGIN=http://localhost:5173
@@ -80,22 +99,18 @@ SIMULATED_IO_MS=0
 DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD_HERE@127.0.0.1:5432/instagram_modeling
 DATABASE_CONNECT_TIMEOUT_MS=5000
 ```
-> [!IMPORTANT]
-> If your database password contains special characters (such as `#`, `@`, `:`, `/`), URL-encode them (e.g., `#` becomes `%23`, `@` becomes `%40`) or wrap the value in single quotes:  
-> `DATABASE_URL='postgresql+asyncpg://postgres:YourPass#123@127.0.0.1:5432/instagram_modeling'`
+*(Note: If your password contains special characters like `#` or `@`, URL-encode them or wrap in quotes).*
 
-#### 2. Create and Activate Python Virtual Environment
+#### 2. Create & Activate Virtual Environment
 ```powershell
-# Create virtual environment
 python -m venv venv
 
-# Activate on Windows (PowerShell):
+# Activate in PowerShell:
 .\venv\Scripts\Activate.ps1
 
-# Or activate on Windows (Command Prompt):
+# Or activate in CMD:
 .\venv\Scripts\activate.bat
 ```
-*(If PowerShell shows a script execution error, see the [Troubleshooting section](#windows-troubleshooting--faq) below).*
 
 #### 3. Install Python Dependencies
 ```powershell
@@ -104,45 +119,43 @@ pip install -r requirements.txt
 ```
 
 #### 4. Run Schema Migrations (Alembic)
-This creates all database tables, foreign keys, and optimized composite indexes:
+Creates all versioned tables, constraints, and composite pagination indexes:
 ```powershell
 alembic upgrade head
 ```
 
 #### 5. Seed Initial Data (Deterministic Dataset)
-Populate the 5 core user profiles, 60 original posts, media, mutual follows, and initial likes:
+Populate the 5 core user profiles, 60 original posts, media, follows, and initial likes:
 ```powershell
+$env:PGCLIENTENCODING = "UTF8"
 psql -U postgres -d instagram_modeling -f ..\db\seed.sql
 ```
-*(Enter your PostgreSQL password when prompted).*
 
 #### 6. Start the FastAPI Backend Server
 ```powershell
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-- **Backend API Base:** `http://127.0.0.1:8000`
-- **Interactive Swagger UI Docs:** `http://127.0.0.1:8000/docs`
-- **Health Live Check:** `http://127.0.0.1:8000/health/live`
-- **Database Readiness Check:** `http://127.0.0.1:8000/health/ready`
+- **Backend Base:** `http://127.0.0.1:8000`
+- **Swagger UI Docs:** `http://127.0.0.1:8000/docs`
+- **Liveness Probe:** `http://127.0.0.1:8000/health/live`
+- **Readiness Probe:** `http://127.0.0.1:8000/health/ready`
 
 ---
 
 ### Step 4: Frontend Setup & Execution (Terminal 2)
 
-Open a **new separate terminal (Terminal 2)** and navigate into the `frontend` directory:
-
+Open a **separate terminal (Terminal 2)** and navigate into the `frontend` directory:
 ```powershell
 cd frontend
 ```
 
 #### 1. Configure the Frontend `.env` File
-Copy the example environment file:
 ```powershell
 # In PowerShell:
 Copy-Item .env.example .env
 
-# Or in Command Prompt (CMD):
+# Or in CMD:
 copy .env.example .env
 ```
 *(Verify `frontend\.env` contains `VITE_API_BASE_URL=http://localhost:8000`).*
@@ -152,40 +165,40 @@ copy .env.example .env
 npm install
 ```
 
-#### 3. Start the Vite React Development Server
+#### 3. Start the React / Vite Development Server
 ```powershell
 npm run dev
 ```
 
-- **Web Application URL:** Open `http://localhost:5173` in your browser (Google Chrome, Edge, Brave, etc.).
+- **Web Application URL:** Open `http://localhost:5173` (or `http://localhost:3000`) in your browser.
 
 ---
 
-## 🔑 Pre-Configured Test Accounts (Seed Dataset)
+## 🔑 3. Pre-Configured Test Accounts (Seed Dataset)
 
-You can log in immediately with any of the seeded creator accounts to test posting, liking, replying, and following:
+You can log in immediately using the **1-Click Login buttons** in the Sign In modal, or by typing the credentials below:
 
-| Profile / Display Name | Handle / Username | Password | Bio / Focus Area |
-| :--- | :--- | :--- | :--- |
-| **Asha Patel** *(Default Demo User)* | `asha` | `TestPassword123!` | Book lover, stationery & study aesthetic 📖📚 |
-| **Deepika** | `deepu` | `TestPassword123!` | Artisanal recipes & gourmet food photography ✨🍝 |
-| **Sneha** | `sneha` | `TestPassword123!` | Botanical aesthetics & garden flora 🌿🌸 |
-| **Anirudh** | `ani` | `TestPassword123!` | Acoustic jams, audio production & beats 🎧🎸 |
-| **Virat** | `virat` | `TestPassword123!` | Match day passion, fitness & willow cricket 🏏⚡ |
+| Profile / Display Name | Handle / Username | 1-Click Modal Password | Fallback Password | Bio / Focus Area |
+| :--- | :--- | :--- | :--- | :--- |
+| **Deepika** | `deepu` | `deepika123` | `TestPassword123!` | Artisanal recipes & gourmet food photography ✨🍝 |
+| **Sneha** | `sneha` | `sneha123` | `TestPassword123!` | Botanical aesthetics & garden flora 🌿🌸 |
+| **Asha Patel** *(Default Demo)* | `asha` | `password123` | `TestPassword123!` | Book lover, stationery & study aesthetic 📖📚 |
+| **Anirudh** | `ani` | `ani123` | `TestPassword123!` | Acoustic jams, audio production & beats 🎧🎸 |
+| **Virat** | `virat` | `virat123` | `TestPassword123!` | Match day passion, fitness & willow cricket 🏏⚡ |
 
 ---
 
-## 🧪 Test Suites & Verification
+## 🧪 4. Test Suites & Verification
 
 ### Run Backend Regression Tests
-Inside the `backend/` directory with virtual environment activated:
+Inside `backend/` with virtual environment active:
 ```powershell
 cd backend
 python -m pytest
 ```
 
 ### Run Frontend Production Build Validation
-Inside the `frontend/` directory:
+Inside `frontend/`:
 ```powershell
 cd frontend
 npm run build
@@ -194,45 +207,46 @@ npm run build
 
 ---
 
-## 🛠️ Windows Troubleshooting & FAQ
+## 🛠️ 5. Windows Troubleshooting & FAQ
 
-### 1. `psql` or `createdb` is not recognized as an internal or external command
-- **Cause:** PostgreSQL's `bin` folder is not in your Windows system `PATH`.
+### 1. `ERROR: character with byte sequence 0x8d in encoding "WIN1252" has no equivalent in encoding "UTF8"`
+- **Cause:** Windows terminal defaults to code page `1252` instead of `UTF-8`, and fails to process emojis in the seed dataset.
+- **Solution:** 
+  In your terminal before running `psql`, execute:
+  ```powershell
+  $env:PGCLIENTENCODING = "UTF8"
+  ```
+  Or inside the `psql` shell (`instagram_modeling=>`), run:
+  ```sql
+  \encoding UTF8
+  \i db/seed.sql
+  ```
+
+### 2. `psql` or `createdb` is not recognized
+- **Cause:** PostgreSQL `bin` folder is not in your Windows system `PATH`.
 - **Solution:**
-  1. Press `Win + S` and search for **Environment Variables**.
-  2. Click **Edit the system environment variables** -> **Environment Variables**.
-  3. Under **System variables**, select `Path` and click **Edit**.
-  4. Click **New** and add your PostgreSQL bin path, typically:
-     `C:\Program Files\PostgreSQL\16\bin` (or version `15`, `17`).
-  5. Click **OK** on all dialogs and **restart your terminal**.
-  - *Quick alternative:* Run commands directly from the **SQL Shell (psql)** app included with PostgreSQL.
+  1. Search for **Environment Variables** in Windows Start menu.
+  2. Under **System variables**, edit `Path` and add: `C:\Program Files\PostgreSQL\16\bin` (or version 15/17).
+  3. Restart your terminal. *(Or use the built-in **SQL Shell (psql)** app).*
 
-### 2. PowerShell Error: `Execution of scripts is disabled on this system`
-- **Cause:** Windows PowerShell restricts running scripts by default policy.
-- **Solution:** Run this one-time command in PowerShell to allow script execution for the current session:
+### 3. PowerShell Error: `Execution of scripts is disabled on this system`
+- **Cause:** Windows restricts PowerShell script execution by default.
+- **Solution:** Run this one-time command in PowerShell:
   ```powershell
   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
   ```
   Then re-run `.\venv\Scripts\Activate.ps1`.
 
-### 3. Password Authentication Failed / Special Characters in Database URL
-- **Cause:** If your database password contains characters like `#`, `@`, or `%`, asyncpg may fail to parse the URI.
-- **Solution:** In `backend\.env`, URL-encode the special characters or enclose the full URL string in single quotes:
+### 4. Password Authentication Failed / Special Characters in Database URL
+- **Cause:** Characters like `#`, `@`, or `%` in PostgreSQL passwords must be URL-encoded (e.g., `#` becomes `%23`).
+- **Solution:** In `backend\.env`, wrap the connection string in single quotes or URL-encode the symbol:
   ```env
   DATABASE_URL='postgresql+asyncpg://postgres:YourPass%23@127.0.0.1:5432/instagram_modeling'
   ```
 
-### 4. Port 8000 or Port 5173 is already in use
-- **Check and free Port 8000 on Windows:**
-  ```powershell
-  netstat -ano | findstr :8000
-  taskkill /PID <PID_NUMBER> /F
-  ```
-- **Or change port in `.env`:** Change `PORT=8001` in `backend\.env` and update `VITE_API_BASE_URL=http://localhost:8001` in `frontend\.env`.
-
 ---
 
-## 🏛️ Architecture & Core Features
+## 🏛️ 6. Architecture & Core Features
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -263,7 +277,7 @@ npm run build
 
 ---
 
-## 📡 API Endpoints Reference
+## 📡 7. API Endpoints Reference
 
 All API endpoints follow strict camelCase payload conventions and include `X-Request-Id` correlation headers:
 
@@ -287,7 +301,7 @@ All API endpoints follow strict camelCase payload conventions and include `X-Req
 
 ---
 
-## 🔒 Domain Invariants & Constraint Rules
+## 🔒 8. Domain Invariants & Constraint Rules
 
 - **Post Kinds:** Strictly `'original'`, `'reply'`, or `'repost'`.
 - **Media Attachments:** Only original posts may own media attachments (0 to 4 media items max, ordered by unique `position`).
@@ -298,7 +312,7 @@ All API endpoints follow strict camelCase payload conventions and include `X-Req
 
 ---
 
-## 📚 Comprehensive Documentation Index
+## 📚 9. Comprehensive Documentation Index
 
 - **[`docs/00_Assignment_Brief_and_API_Contract.md`](file:///f:/Instagram/docs/00_Assignment_Brief_and_API_Contract.md):** Authoritative API contract and assignment specifications.
 - **[`docs/03_Shared_Database_Modeling_PRD.md`](file:///f:/Instagram/docs/03_Shared_Database_Modeling_PRD.md):** Schema design, ERD diagrams, and constraint rationale.
