@@ -59,7 +59,7 @@ TARGET_USERS = [
     },
 ]
 
-KEEP_HANDLES = {'asha', 'deepu', 'ani', 'virat', 'sneha', 'vivek', 'sand', 't1234', 'gollapilli'}
+KEEP_HANDLES = {'asha', 'deepu', 'ani', 'virat', 'sneha', 'vivek', 'sand', 't1234'}
 
 async def main():
     session_factory = get_async_sessionmaker()

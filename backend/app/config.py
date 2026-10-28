@@ -66,6 +66,16 @@ class Settings(BaseSettings):
             raise ValueError(f"DEMO_USER_ID must be a valid UUID string, got '{v}'")
         return v.lower()
 
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        """Ensure cloud DATABASE_URL automatically uses the asyncpg driver."""
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
 
 @lru_cache
 def get_settings() -> Settings:
