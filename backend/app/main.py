@@ -205,6 +205,11 @@ def create_app() -> FastAPI:
         )
 
     # 3. Register Routers
+    @app.get("/", include_in_schema=False)
+    async def root():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/docs")
+
     app.include_router(health_router)
     app.include_router(feed_router) 
     app.include_router(posts_router)
